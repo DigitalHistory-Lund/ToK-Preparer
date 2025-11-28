@@ -23,13 +23,10 @@ data_dir = Path('.').resolve() / 'data'
 data_dir.mkdir(exist_ok=True)
 
 
-if len([file for file in data_dir.iterdir() if file.is_file()]) < 25:
-    print('Did not find metadata files. Downloading.')
+def dowload_speaker_metadata():
     download_corpus(partitions=["persons"])
 
-records_data_dir = data_dir / 'records'
-if len([subdir for subdir in data_dir.iterdir() if subdir.is_dir()]) < 158:
-    print('Did not find protocols files. Downloading.')
+def download_speech_data():
     download_corpus(partitions=["records"])
 
 
