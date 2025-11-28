@@ -1,6 +1,5 @@
-from pyparlaclarin.read import paragraph_iterator, speeches_with_name
 from pyriksdagen.utils import protocol_iterators, download_corpus
-
+from itertools import islice
 from pathlib import Path
 from queue import Queue
 from lxml import etree
@@ -153,9 +152,6 @@ for utterance in tqdm(
     extract_all_utterances(protocols), total=701_218
 ):  # total=5273785):
     all_utterances.append(utterance)
-
-
-from itertools import islice
 
 
 def batched(iterable, n, *, strict=False):
