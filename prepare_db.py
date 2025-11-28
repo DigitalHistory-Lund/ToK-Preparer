@@ -6,16 +6,10 @@ from queue import Queue
 from lxml import etree
 from tqdm.auto import tqdm
 
-import progressbar
-import pyriksdagen
-import ipywidgets
 
-import plotly.offline as pyo
-import plotly.graph_objs as go
 from typing import List, Tuple
 
 from collections import defaultdict
-from collections import Counter
 
 import sqlite3
 import json
