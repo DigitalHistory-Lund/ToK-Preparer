@@ -207,7 +207,6 @@ with sqlite3.connect(tmp_db) as conn:
 
 
 
-term_counter = Counter()
 
 with sqlite3.connect(tmp_db) as conn:
     cur = conn.cursor()
