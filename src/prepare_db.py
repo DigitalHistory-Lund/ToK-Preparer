@@ -17,6 +17,14 @@ import os
 
 from src.settings import data_dir, tmp_db
 
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filename="prepare_db.log",
+)
+
 parser = etree.XMLParser(remove_blank_text=True)
 
 
@@ -221,27 +229,27 @@ with sqlite3.connect(tmp_db) as conn:
 with sqlite3.connect(tmp_db) as conn:
     cur = conn.cursor()
 
-    print(
+    logging.info(
         cur.execute(
             'select count(*) from utterance_fts where content match "kvinna AND kvinnor"'
         ).fetchall()
     )
-    print(
+    logging.info(
         cur.execute(
             'select count(*) from utterance_fts where content match "kvinna"'
         ).fetchall()
     )
-    print(
+    logging.info(
         cur.execute(
             'select count(*) from utterance_fts where content match "kvinnor"'
         ).fetchall()
     )
-    print(
+    logging.info(
         cur.execute(
             'select count(*) from utterance_fts where content match "kvinna OR kvinnor"'
         ).fetchall()
     )
-    print(
+    logging.info(
         cur.execute(
             'select count(*) from utterance_fts where content match "kvinn*"'
         ).fetchall()
