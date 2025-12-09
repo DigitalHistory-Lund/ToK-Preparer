@@ -260,40 +260,6 @@ with sqlite3.connect(tmp_db) as conn:
     )
 
 
-def get_timeline(match_pattern: str) -> List[Tuple[int, int]]:
-    with sqlite3.connect(tmp_db) as conn:
-        cur = conn.cursor()
-
-        return cur.execute(
-            f'select year, count(*) from utterance as u join utterance_fts as uf on u.rowid == uf.rowid where content match "{match_pattern}" group by year'
-        ).fetchall()
-
-
-def get_baseline():
-    with sqlite3.connect(tmp_db) as conn:
-        cur = conn.cursor()
-
-        return {
-            x: y
-            for x, y in cur.execute(
-                f"select year, count(*) from utterance as u join utterance_fts as uf on u.rowid == uf.rowid group by year"
-            ).fetchall()
-        }
-
-
-baseline = get_baseline()
-
-
-def get_or_timeline(keywords: List[str]) -> List[Tuple[int, int]]:
-    pattern = " OR ".join(keywords)
-    return get_timeline(pattern)
-
-
-kvinn = get_timeline("kvinn*")
-kvinna = get_timeline("kvinna")
-korv = get_timeline("korv")
-
-
 queries = {
     "kvinna": ["kvinna"],
     "kvinna 1": ["kvinn*"],
