@@ -16,6 +16,7 @@ import re
 import os
 
 from src.settings import data_dir, tmp_db
+from queries import queries
 
 import logging
 
@@ -150,14 +151,23 @@ for utterance in tqdm(
     all_utterances.append(utterance)
 
 
-if os.path.exists(tmp_db):
-    os.unlink(tmp_db)
-
 with sqlite3.connect(tmp_db) as conn:
     cur = conn.cursor()
-    cur.execute(
-        "CREATE TABLE utterance (id str primary key, prev text, next text, who text, year int, date int, gender text, party text)"
-    )
+    cur.execute("""
+        CREATE TABLE utterance (
+            id str primary key,
+            prev text,
+            next text,
+            who text,
+            year int,
+            date int,
+            gender text,
+            party text,
+            kvinna_1 bool,
+            kvinna_2 bool,
+            kvinna_3 bool,
+        )
+""")
     # cur.execute("PRAGMA compile_options LIKE '%SQLITE_ENABLE_FTS5%';")
     cur.execute("CREATE VIRTUAL TABLE utterance_fts USING fts5(id, content)")
     cur.execute("CREATE VIRTUAL TABLE reverse_utterance_fts USING fts5(id, content)")
@@ -208,7 +218,6 @@ with sqlite3.connect(tmp_db) as conn:
 
         conn.commit()
 
-    # TODO: Add speaker metadata
     cur.execute("""
     UPDATE utterance
     SET party = (
