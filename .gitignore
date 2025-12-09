@@ -1,1 +1,7 @@
 *.ipynb
+*.zip
+*.log
+
+
+__pycache__/
+data/
