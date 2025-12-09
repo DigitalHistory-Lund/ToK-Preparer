@@ -249,12 +249,7 @@ with sqlite3.connect(tmp_db) as conn:
 
 
 queries = {
-    "kvinna": ["kvinna"],
     "kvinna 1": ["kvinn*"],
-    # 'The name that shows up in the plot' : ['term1', 'term_2', 'ansikte', 'fler', 'etc'],
-    #'mans' : ['mans'],
-    #'Första sökning*' : ['hon', 'henne*', 'fru*', 'fröken*', 'fröknar*', 'dam', 'dame*', 'mor', 'moder*', 'mamma*', 'mammor*','flick*', 'syster*', 'systrar', 'dotter*', 'döttrar*', 'hustru*','änka*', 'änke*', 'fruntimmer*', 'jungfru*'],
-    # Non work-related titles
     "Kvinna 2": [
         "hon",
         "henne*",
