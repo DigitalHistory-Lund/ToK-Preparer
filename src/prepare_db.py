@@ -19,7 +19,7 @@ import os
 
 parser = etree.XMLParser(remove_blank_text=True)
 
-data_dir = Path(".").resolve() / "data"
+data_dir = Path(__file__).resolve().parents[1] / "data"
 data_dir.mkdir(exist_ok=True)
 
 
@@ -55,7 +55,7 @@ def datestr_to_int(date_str):
 
 def load_id_to_date():
     # Loading utterance to (intified) dates
-    year_path = Path(".") / "year_data.gzip"
+    year_path = Path(__file__).parents[1] / "year_data.gzip"
     if not year_path.exists():
         raise FileNotFoundError(f'Could not find "{year_path}"')
     with gzip.open(year_path, "rt") as f:
@@ -99,7 +99,7 @@ def load_person_dates_affiliation():
         yield (row["person_id"], start, end, row["party"])
 
 
-protocols = list(sorted(protocol_iterators(corpus_root="data/", start=1899, end=1941)))
+protocols = list(sorted(protocol_iterators(corpus_root=data_dir, start=1899, end=1941)))
 print(len(protocols))
 
 
@@ -153,7 +153,7 @@ for utterance in tqdm(
     all_utterances.append(utterance)
 
 
-tmp_db = "./tmp.db"
+tmp_db = "../tmp.db"
 if os.path.exists(tmp_db):
     os.unlink(tmp_db)
 
