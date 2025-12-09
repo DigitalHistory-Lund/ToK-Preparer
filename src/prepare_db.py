@@ -15,7 +15,7 @@ import csv
 import re
 import os
 
-from src.settings import data_dir, tmp_db
+from settings import data_dir, tmp_db
 from queries import queries
 
 import logging
@@ -97,13 +97,6 @@ def load_person_dates_affiliation():
         yield (row["person_id"], start, end, row["party"])
 
 
-protocols = list(sorted(protocol_iterators(corpus_root=data_dir, start=1899, end=1941)))
-print(len(protocols))
-
-
-int(protocols[0].split("/")[1][:4])
-
-
 def prepare_roots(protocols):
     for protocol in protocols:
         year = int(protocol.split("/")[1][:4])
@@ -137,102 +130,111 @@ def process_root_queue(q: Queue):
                 q.put((c + 1, child, year))
 
 
-def extract_all_utterances(protocols):
+def extract_all_utterances():
     q = Queue()
-    for root, year in prepare_roots(protocols):
+    for root, year in prepare_roots(
+        protocol_iterators(corpus_root=data_dir, start=1899, end=1941)
+    ):
         q.put((0, root, year))
     yield from process_root_queue(q)
 
 
-all_utterances = []
-for utterance in tqdm(
-    extract_all_utterances(protocols), total=701_218
-):  # total=5273785):
-    all_utterances.append(utterance)
+def all_utterances_generator():
+    for utterance in tqdm(extract_all_utterances(), total=701_218):
+        yield utterance
 
 
-with sqlite3.connect(tmp_db) as conn:
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE utterance (
-            id str primary key,
-            prev text,
-            next text,
-            who text,
-            year int,
-            date int,
-            gender text,
-            party text,
-            kvinna_1 bool,
-            kvinna_2 bool,
-            kvinna_3 bool,
-        )
-""")
-    # cur.execute("PRAGMA compile_options LIKE '%SQLITE_ENABLE_FTS5%';")
-    cur.execute("CREATE VIRTUAL TABLE utterance_fts USING fts5(id, content)")
-    cur.execute("CREATE VIRTUAL TABLE reverse_utterance_fts USING fts5(id, content)")
-
-    cur.execute("CREATE TABLE affiliation (who text, start int, end int, party text)")
-
-    cur.execute("CREATE index next_index on utterance(next)")
-    cur.execute("CREATE index prev_index on utterance(prev)")
-    cur.execute("CREATE index who_index on utterance(who)")
-    cur.execute("CREATE index year_index on utterance(year)")
-
-    cur.executemany(
-        "INSERT INTO affiliation (who, start, end, party) values (?,?,?,?)",
-        load_person_dates_affiliation(),
-    )
-    cur.execute("CREATE index aff_index on affiliation(who)")
-
-    data = []
-    for batch in tqdm(
-        batched(all_utterances, 50_000), total=len(all_utterances) // 50_000
-    ):
-        data = [
-            {
-                "id": u_id,
-                "prev": prev,
-                "next": nxt,
-                "content": text,
-                "reverse_content": text[::-1],
-                "who": who,
-                "year": year,
-                "gender": id_to_gender[who],
-                "date": id_to_intdate[u_id],
-            }
-            for u_id, prev, nxt, text, who, year in batch
-        ]
-
-        cur.executemany(
-            "INSERT INTO utterance_fts (id, content) values (:id, :content)", data
-        )
-        cur.executemany(
-            "INSERT INTO reverse_utterance_fts (id, content) values (:id, :reverse_content)",
-            data,
-        )
-        cur.executemany(
-            "INSERT INTO utterance (id, prev, next, who, year, gender, date) values (:id, :prev, :next, :who, :year, :gender, :date)",
-            data,
-        )
-
-        conn.commit()
-
-    cur.execute("""
-    UPDATE utterance
-    SET party = (
-        SELECT party
-        FROM affiliation
-        WHERE utterance.who = affiliation.who
-          AND date BETWEEN start AND end
-    )
-    WHERE EXISTS (
-        SELECT 1
-        FROM affiliation
-        WHERE utterance.who = affiliation.who
-          AND date BETWEEN start AND end
-    )
+def create_database():
+    with sqlite3.connect(tmp_db) as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE utterance (
+                id str primary key,
+                prev text,
+                next text,
+                who text,
+                year int,
+                date int,
+                gender text,
+                party text,
+                kvinna_1 bool,
+                kvinna_2 bool,
+                kvinna_3 bool,
+            )
     """)
+        # cur.execute("PRAGMA compile_options LIKE '%SQLITE_ENABLE_FTS5%';")
+        cur.execute("CREATE VIRTUAL TABLE utterance_fts USING fts5(id, content)")
+        cur.execute(
+            "CREATE VIRTUAL TABLE reverse_utterance_fts USING fts5(id, content)"
+        )
+
+        cur.execute(
+            "CREATE TABLE affiliation (who text, start int, end int, party text)"
+        )
+
+        cur.execute("CREATE index next_index on utterance(next)")
+        cur.execute("CREATE index prev_index on utterance(prev)")
+        cur.execute("CREATE index who_index on utterance(who)")
+        cur.execute("CREATE index year_index on utterance(year)")
+
+        cur.executemany(
+            "INSERT INTO affiliation (who, start, end, party) values (?,?,?,?)",
+            load_person_dates_affiliation(),
+        )
+        cur.execute("CREATE index aff_index on affiliation(who)")
+
+
+def seed_database():
+    with sqlite3.connect(tmp_db) as conn:
+        data = []
+        for batch in tqdm(
+            batched(all_utterances_generator(), 50_000),
+            total=701_218 // 50_000,
+        ):
+            data = [
+                {
+                    "id": u_id,
+                    "prev": prev,
+                    "next": nxt,
+                    "content": text,
+                    "reverse_content": text[::-1],
+                    "who": who,
+                    "year": year,
+                    "gender": id_to_gender[who],
+                    "date": id_to_intdate[u_id],
+                }
+                for u_id, prev, nxt, text, who, year in batch
+            ]
+
+            cur.executemany(
+                "INSERT INTO utterance_fts (id, content) values (:id, :content)", data
+            )
+            cur.executemany(
+                "INSERT INTO reverse_utterance_fts (id, content) values (:id, :reverse_content)",
+                data,
+            )
+            cur.executemany(
+                "INSERT INTO utterance (id, prev, next, who, year, gender, date) values (:id, :prev, :next, :who, :year, :gender, :date)",
+                data,
+            )
+
+            conn.commit()
+
+        cur.execute("""
+        UPDATE utterance
+        SET party = (
+            SELECT party
+            FROM affiliation
+            WHERE utterance.who = affiliation.who
+            AND date BETWEEN start AND end
+        )
+        WHERE EXISTS (
+            SELECT 1
+            FROM affiliation
+            WHERE utterance.who = affiliation.who
+            AND date BETWEEN start AND end
+        )
+        """)
 
 
 with sqlite3.connect(tmp_db) as conn:
