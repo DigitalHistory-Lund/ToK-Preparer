@@ -159,10 +159,9 @@ def create_database():
                 party text,
                 kvinna_1 bool,
                 kvinna_2 bool,
-                kvinna_3 bool,
+                kvinna_3 bool
             )
-    """)
-        # cur.execute("PRAGMA compile_options LIKE '%SQLITE_ENABLE_FTS5%';")
+        """)
         cur.execute("CREATE VIRTUAL TABLE utterance_fts USING fts5(id, content)")
         cur.execute(
             "CREATE VIRTUAL TABLE reverse_utterance_fts USING fts5(id, content)"
@@ -186,6 +185,7 @@ def create_database():
 
 def seed_database():
     with sqlite3.connect(tmp_db) as conn:
+        cur = conn.cursor()
         data = []
         for batch in tqdm(
             batched(all_utterances_generator(), 50_000),
@@ -237,31 +237,61 @@ def seed_database():
         """)
 
 
-with sqlite3.connect(tmp_db) as conn:
-    cur = conn.cursor()
+def tag_utterances_by_query():
+    with sqlite3.connect(tmp_db) as conn:
+        cur = conn.cursor()
+        for label, query_terms in queries.items():
+            query_str = " OR ".join(query_terms)
+            logging.info(f'Tagging utterances for "{label}" with query "{query_str}"')
+            cur.execute(
+                f"""
+                UPDATE utterance
+                SET {label.replace(" ", "_").lower()} = 1
+                WHERE id IN (
+                    SELECT id
+                    FROM utterance_fts
+                    WHERE content MATCH ?
+                )
+                """,
+                (query_str,),
+            )
+        conn.commit()
 
-    logging.info(
-        cur.execute(
-            'select count(*) from utterance_fts where content match "kvinna AND kvinnor"'
-        ).fetchall()
-    )
-    logging.info(
-        cur.execute(
-            'select count(*) from utterance_fts where content match "kvinna"'
-        ).fetchall()
-    )
-    logging.info(
-        cur.execute(
-            'select count(*) from utterance_fts where content match "kvinnor"'
-        ).fetchall()
-    )
-    logging.info(
-        cur.execute(
-            'select count(*) from utterance_fts where content match "kvinna OR kvinnor"'
-        ).fetchall()
-    )
-    logging.info(
-        cur.execute(
-            'select count(*) from utterance_fts where content match "kvinn*"'
-        ).fetchall()
-    )
+
+def count_baselines():
+    with sqlite3.connect(tmp_db) as conn:
+        cur = conn.cursor()
+
+        logging.info(
+            cur.execute(
+                'select count(*) from utterance_fts where content match "kvinna AND kvinnor"'
+            ).fetchall()
+        )
+        logging.info(
+            cur.execute(
+                'select count(*) from utterance_fts where content match "kvinna"'
+            ).fetchall()
+        )
+        logging.info(
+            cur.execute(
+                'select count(*) from utterance_fts where content match "kvinnor"'
+            ).fetchall()
+        )
+        logging.info(
+            cur.execute(
+                'select count(*) from utterance_fts where content match "kvinna OR kvinnor"'
+            ).fetchall()
+        )
+        logging.info(
+            cur.execute(
+                'select count(*) from utterance_fts where content match "kvinn*"'
+            ).fetchall()
+        )
+
+
+if __name__ == "__main__":
+    if not tmp_db.exists():
+        create_database()
+    seed_database()
+    count_baselines()
+    tag_utterances_by_query()
