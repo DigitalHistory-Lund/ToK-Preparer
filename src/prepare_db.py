@@ -1,12 +1,10 @@
-from pyriksdagen.utils import protocol_iterators, download_corpus
+from pyriksdagen.utils import protocol_iterators
 from itertools import batched
 from pathlib import Path
 from queue import Queue
 from lxml import etree
 from tqdm.auto import tqdm
 
-
-from typing import List, Tuple
 
 from collections import defaultdict
 
@@ -17,18 +15,9 @@ import csv
 import re
 import os
 
+from src.settings import data_dir, tmp_db
+
 parser = etree.XMLParser(remove_blank_text=True)
-
-data_dir = Path(__file__).resolve().parents[1] / "data"
-data_dir.mkdir(exist_ok=True)
-
-
-def dowload_speaker_metadata():
-    download_corpus(partitions=["persons"])
-
-
-def download_speech_data():
-    download_corpus(partitions=["records"])
 
 
 def datestr_to_int(date_str):
@@ -153,7 +142,6 @@ for utterance in tqdm(
     all_utterances.append(utterance)
 
 
-tmp_db = "../tmp.db"
 if os.path.exists(tmp_db):
     os.unlink(tmp_db)
 
