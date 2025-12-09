@@ -1,7 +1,7 @@
 *.ipynb
 *.zip
 *.log
-
+*.sqlite3
 
 __pycache__/
 data/
