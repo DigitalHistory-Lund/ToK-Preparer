@@ -1,5 +1,5 @@
 from pyriksdagen.utils import protocol_iterators, download_corpus
-from itertools import islice
+from itertools import batched
 from pathlib import Path
 from queue import Queue
 from lxml import etree
@@ -115,7 +115,6 @@ def prepare_roots(protocols):
 def process_root_queue(q: Queue):
     """
     TODO: Extract debate names
-    TODO: Extract dates
     """
     while not q.empty():
         c, element, year = q.get()
@@ -152,17 +151,6 @@ for utterance in tqdm(
     extract_all_utterances(protocols), total=701_218
 ):  # total=5273785):
     all_utterances.append(utterance)
-
-
-def batched(iterable, n, *, strict=False):
-    # batched('ABCDEFG', 2) → AB CD EF G
-    if n < 1:
-        raise ValueError("n must be at least one")
-    iterator = iter(iterable)
-    while batch := tuple(islice(iterator, n)):
-        if strict and len(batch) != n:
-            raise ValueError("batched(): incomplete batch")
-        yield batch
 
 
 tmp_db = "./tmp.db"
