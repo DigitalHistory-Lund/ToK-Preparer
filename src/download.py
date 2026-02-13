@@ -1,9 +1,5 @@
 from pyriksdagen.utils import download_corpus
 from settings import data_dir
-from pathlib import Path
-
-data_dir.mkdir(exist_ok=True)
-data_here = Path(__file__).parent.resolve() / "data"
 
 
 def dowload_speaker_metadata():
