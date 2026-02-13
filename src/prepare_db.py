@@ -15,8 +15,8 @@ import csv
 import re
 import os
 
-from settings import data_dir, tmp_db
-from queries import queries
+from .settings import data_dir, tmp_db
+from .queries import queries
 
 import logging
 
@@ -63,14 +63,6 @@ def load_id_to_date():
             for _id in ids
         }
     return id_to_intdate
-
-
-id_to_intdate = load_id_to_date()
-
-# ID to gender - default to None if there is no data
-id_to_gender = defaultdict(lambda: None)
-for row in csv.DictReader(open(data_dir / "person.csv")):
-    id_to_gender[row["person_id"]] = row["gender"]
 
 
 # Generator for loading party affiliation with intified date ranges.
@@ -184,6 +176,13 @@ def create_database():
 
 
 def seed_database():
+    id_to_intdate = load_id_to_date()
+
+    # ID to gender - default to None if there is no data
+    id_to_gender = defaultdict(lambda: None)
+    for row in csv.DictReader(open(data_dir / "person.csv")):
+        id_to_gender[row["person_id"]] = row["gender"]
+
     with sqlite3.connect(tmp_db) as conn:
         cur = conn.cursor()
         data = []
@@ -289,9 +288,12 @@ def count_baselines():
         )
 
 
-if __name__ == "__main__":
+def prepare_database():
     if not tmp_db.exists():
         create_database()
     seed_database()
     count_baselines()
     tag_utterances_by_query()
+
+if __name__ == "__main__":
+    prepare_database()

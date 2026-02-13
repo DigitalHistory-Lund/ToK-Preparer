@@ -1,4 +1,4 @@
-from settings import tmp_db, out_db, root
+from .settings import tmp_db, out_db, root
 import sqlite3
 from itertools import batched
 from tqdm import tqdm

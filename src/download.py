@@ -1,5 +1,5 @@
 from pyriksdagen.utils import download_corpus
-from settings import data_dir
+from .settings import data_dir
 
 
 def dowload_speaker_metadata():
@@ -16,6 +16,9 @@ def download_speech_data():
         download_corpus(partitions=["records"])
 
 
-if __name__ == "__main__":
+def download_corpus_and_metadata():
     dowload_speaker_metadata()
     download_speech_data()
+
+if __name__ == "__main__":
+    download_corpus_and_metadata()
