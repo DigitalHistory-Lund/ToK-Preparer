@@ -1,11 +1,13 @@
 from pyriksdagen.utils import download_corpus
-from .settings import data_dir
+from .settings import data_dir, root
 
 
-def dowload_speaker_metadata():
-    pass
-    if len([file for file in data_dir.iterdir() if file.is_file()]) < 25:
-        download_corpus(partitions=["persons"])
+def download_speaker_metadata():
+    if (
+        not data_dir.exists()
+        or len([file for file in data_dir.iterdir() if file.is_file()]) < 25
+    ):
+        download_corpus(partitions=["persons"], path=str(root), keep_zip=True)
 
 
 def download_speech_data():
@@ -13,11 +15,11 @@ def download_speech_data():
         not data_dir.exists()
         or len([subdir for subdir in data_dir.iterdir() if subdir.is_dir()]) < 158
     ):
-        download_corpus(partitions=["records"])
+        download_corpus(partitions=["records"], path=str(root), keep_zip=True)
 
 
 def download_corpus_and_metadata():
-    dowload_speaker_metadata()
+    download_speaker_metadata()
     download_speech_data()
 
 if __name__ == "__main__":
