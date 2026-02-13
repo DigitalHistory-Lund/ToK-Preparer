@@ -91,7 +91,7 @@ def load_person_dates_affiliation():
 
 def prepare_roots(protocols):
     for protocol in protocols:
-        year = int(protocol.split("/")[1][:4])
+        year = int(protocol.split("/")[-2][:4])
         yield etree.parse(protocol, parser).getroot(), year
 
 
