@@ -28,6 +28,8 @@ import logging
 from collections import namedtuple
 from itertools import pairwise
 
+EXPECTED_COUNT = 177_483
+
 Utterance = namedtuple(
     "utterance",
     [
@@ -153,7 +155,7 @@ def extract_all_utterances():
 
 
 def all_utterances_generator():
-    for utterance in tqdm(extract_all_utterances(), total=701_218):
+    for utterance in tqdm(extract_all_utterances(), total=EXPECTED_COUNT):
         yield utterance
 
 
@@ -334,7 +336,7 @@ def seed_database():
         data = []
         for batch in tqdm(
             batched(merged_utterances(), 50_000),
-            total=701_218 // 50_000,
+            total=EXPECTED_COUNT // 50_000,
         ):
             data = [
                 {
