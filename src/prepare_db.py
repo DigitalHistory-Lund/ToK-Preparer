@@ -118,6 +118,9 @@ def process_root_queue(q: Queue):
     """
     while not q.empty():
         c, element, year = q.get()
+        # Temporary fix to avoid ghost utterance in prot-1899--ak--007.xml
+        if int(year) < 1900:
+            continue
         if (who := element.get("who")) is not None:
             u_id = element.get(
                 [key for key in element.keys() if key.endswith("}id")][0]
