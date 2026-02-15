@@ -210,15 +210,34 @@ def merged_utterances():
                 Warning(
                     f"Broken link ({old.next=}, {new.id=} ;; {old.id=}, {new.prev=})\nbetween {old=} ; {new=}"
                 )
+                ghost = ""
+                if old.next is not None:
+                    ghost = f"{old.year} ; {new.id=} ; {old.next}\n"
+                elif new.prev is not None:
+                    ghost = f"{new.year} ; {old.id=} ; {new.next}\n"
+
+                with open(ghost_log, "a", encoding="utf8") as f:
+                    f.write(ghost)
 
         elif num_nones == 0:
+            ghost = ""
             if old.next == new.prev:
-                with open(ghost_log, "a") as f:
-                    f.write(f"{old.year} ; {old.next}\n")
+                ghost = f"{old.year} ; skipped ; {old.next}\n"
             elif not old.next == new.id:
-                raise ValueError(f"{old.next=} != {new.id=}")
+                # raise ValueError(
+                Warning(
+                    f"{old.next=} != {new.id=}",
+                )
+                ghost = f"{old.year} ; {new.id=} ; {old.next}\n"
             elif not old.id == new.prev:
-                raise ValueError(f"{old.id=} != {new.prev=}")
+                # raise ValueError(
+                Warning(
+                    f"{old.id=} != {new.prev=}",
+                )
+                ghost = f"{new.year} ; {old.id=} ; {new.next}\n"
+
+            with open(ghost_log, "a") as f:
+                f.write(ghost)
 
         # We do not merge the 'unknowns'
         if old.who == "unknown":
