@@ -153,7 +153,7 @@ def all_utterances_generator():
         yield utterance
 
 
-def utterancer():
+def raw_utterances():
     items = extract_all_utterances()
     item = next(items)
     yield Utterance(None, None, None, "First", None, None)
@@ -162,9 +162,9 @@ def utterancer():
     yield Utterance(None, None, None, "Last", None, None)
 
 
-def utteranced():
+def merged_utterances():
     composite = Utterance(None, None, None, None, None, None)
-    for old, new in pairwise(utterancer()):
+    for old, new in pairwise(raw_utterances()):
         # Sifting out first line
         if old.who is None and old.text == "First":
             composite = new
@@ -185,8 +185,10 @@ def utteranced():
         if num_nones == 1:
             raise ValueError(f"Broken link between {old=} ; {new=}")
         elif num_nones == 0:
-            if not old.next == new.prev:
-                raise ValueError(f"{old.next=} != {new.prev=}")
+            if not old.next == new.id:
+                raise ValueError(f"{old.next=} != {new.id=}")
+            if not old.id == new.prev:
+                raise ValueError(f"{old.id=} != {new.prev=}")
 
         # We do not merge the 'unknowns'
         if old.who == "unknown":
@@ -282,7 +284,7 @@ def seed_database():
         cur = conn.cursor()
         data = []
         for batch in tqdm(
-            batched(utteranced(), 50_000),
+            batched(merged_utterances(), 50_000),
             total=701_218 // 50_000,
         ):
             data = [
