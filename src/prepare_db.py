@@ -15,6 +15,8 @@ import csv
 import re
 import os
 
+from math import ceil
+
 from datetime import datetime
 
 from .settings import data_dir, tmp_db
@@ -170,7 +172,11 @@ def raw_utterances():
 
 def merged_utterances():
     composite = Utterance(None, None, None, None, None, None)
-    for old, new in pairwise(raw_utterances()):
+    for old, new in tqdm(
+        pairwise(raw_utterances()),
+        total=EXPECTED_COUNT + 1,
+        desc="Merging Utterances",
+    ):
         # Sifting out first line
         if old.who is None and old.text == "First":
             composite = new
@@ -336,7 +342,8 @@ def seed_database():
         data = []
         for batch in tqdm(
             batched(merged_utterances(), 50_000),
-            total=EXPECTED_COUNT // 50_000,
+            total=ceil(EXPECTED_COUNT / 50_000),
+            desc="Writing utterances to DB",
         ):
             data = [
                 {
