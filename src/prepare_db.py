@@ -20,6 +20,23 @@ from .queries import queries
 
 import logging
 
+
+from collections import namedtuple
+from itertools import pairwise
+
+Utterance = namedtuple(
+    "utterance",
+    [
+        "id",
+        "prev",
+        "next",
+        "text",
+        "who",
+        "year",
+    ],
+)
+
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -108,16 +125,16 @@ def process_root_queue(q: Queue):
             assert u_id
             prev = element.get("prev")
             nxt = element.get("next")
-
             text = "\n\n".join(
                 re.sub(r"\s+", " ", seg.text) for seg in element.getchildren()
             )
-            yield u_id, prev, nxt, text, who, year
+            yield Utterance(u_id, prev, nxt, text, who, year)
         else:
             for child in element.getchildren():
-                if (
-                    child.tag.endswith("note") or child.tag.endswith("seg")
-                ) and not bool(re.search(r"^\S+dag", child.text)):
+                if (child.tag.endswith("note") or child.tag.endswith("seg")) and (
+                    child.text is not None
+                    and not bool(re.search(r"^\S+dag", child.text))
+                ):
                     continue
                 q.put((c + 1, child, year))
 
@@ -134,6 +151,84 @@ def extract_all_utterances():
 def all_utterances_generator():
     for utterance in tqdm(extract_all_utterances(), total=701_218):
         yield utterance
+
+
+def utterancer():
+    items = extract_all_utterances()
+    item = next(items)
+    yield Utterance(None, None, None, "First", None, None)
+    yield item
+    yield from items
+    yield Utterance(None, None, None, "Last", None, None)
+
+
+def utteranced():
+    composite = Utterance(None, None, None, None, None, None)
+    for old, new in pairwise(utterancer()):
+        # Sifting out first line
+        if old.who is None and old.text == "First":
+            composite = new
+            continue
+        elif new.who is None and new.text == "Last":
+            if old.next is not None:
+                raise ValueError(f"{old.next=} is refering to a non-existing item")
+            if composite.next is not None:
+                raise ValueError(
+                    f"{composite.next=} is refering to a non-existing item"
+                )
+
+            yield composite
+            break
+
+        # QC: Check links
+        num_nones = [old.next, new.prev].count(None)
+        if num_nones == 1:
+            raise ValueError(f"Broken link between {old=} ; {new=}")
+        elif num_nones == 0:
+            if not old.next == new.prev:
+                raise ValueError(f"{old.next=} != {new.prev=}")
+
+        # We do not merge the 'unknowns'
+        if old.who == "unknown":
+            yield composite
+            composite = Utterance(
+                id=new.id,
+                prev=composite.id,
+                next=new.next,
+                text=new.text,
+                who=new.who,
+                year=new.year,
+            )
+            continue
+
+        # Merging composite with the new data
+        elif all(
+            (
+                old.year == new.year,
+                old.who == new.who,
+                old.next == new.id,
+                old.id == new.prev,
+            )
+        ):
+            composite = Utterance(
+                id=composite.id,
+                prev=composite.prev,
+                next=new.next,
+                text=composite.text + " " + new.text,
+                who=composite.who,
+                year=composite.year,
+            )
+        # Yielding the composite to create a composite from the new
+        else:
+            yield composite
+            composite = Utterance(
+                id=new.id,
+                prev=composite.id,
+                next=new.next,
+                text=new.text,
+                who=new.who,
+                year=new.year,
+            )
 
 
 def create_database():
@@ -187,7 +282,7 @@ def seed_database():
         cur = conn.cursor()
         data = []
         for batch in tqdm(
-            batched(all_utterances_generator(), 50_000),
+            batched(utteranced(), 50_000),
             total=701_218 // 50_000,
         ):
             data = [
