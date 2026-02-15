@@ -15,7 +15,11 @@ import csv
 import re
 import os
 
+from datetime import datetime
+
 from .settings import data_dir, tmp_db
+
+ghost_log = data_dir / f"{datetime.now().strftime('%Y-%m-%dT%H:%M')}.ghosts.txt"
 from .queries import queries
 
 import logging
@@ -118,9 +122,6 @@ def process_root_queue(q: Queue):
     """
     while not q.empty():
         c, element, year = q.get()
-        # Temporary fix to avoid ghost utterance in prot-1899--ak--007.xml
-        if int(year) < 1900:
-            continue
         if (who := element.get("who")) is not None:
             u_id = element.get(
                 [key for key in element.keys() if key.endswith("}id")][0]
@@ -186,11 +187,37 @@ def merged_utterances():
         # QC: Check links
         num_nones = [old.next, new.prev].count(None)
         if num_nones == 1:
-            raise ValueError(f"Broken link between {old=} ; {new=}")
+            if old.next == new.id and new.prev is None:
+                new = Utterance(
+                    id=new.id,
+                    prev=old.id,
+                    next=new.next,
+                    text=new.text,
+                    who=new.who,
+                    year=new.year,
+                )
+            elif old.id == new.prev and old.next is None:
+                old = Utterance(
+                    id=old.id,
+                    prev=old.prev,
+                    next=new.id,
+                    text=old.text,
+                    who=old.who,
+                    year=old.year,
+                )
+            else:
+                # raise ValueError(
+                Warning(
+                    f"Broken link ({old.next=}, {new.id=} ;; {old.id=}, {new.prev=})\nbetween {old=} ; {new=}"
+                )
+
         elif num_nones == 0:
-            if not old.next == new.id:
+            if old.next == new.prev:
+                with open(ghost_log, "a") as f:
+                    f.write(f"{old.year} ; {old.next}\n")
+            elif not old.next == new.id:
                 raise ValueError(f"{old.next=} != {new.id=}")
-            if not old.id == new.prev:
+            elif not old.id == new.prev:
                 raise ValueError(f"{old.id=} != {new.prev=}")
 
         # We do not merge the 'unknowns'
