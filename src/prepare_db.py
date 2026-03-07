@@ -29,7 +29,7 @@ from itertools import pairwise
 
 EXPECTED_COUNT = 697_343
 EXPECTED_MERGED_COUNT = 173_713
-BATCH_SIZE = 10_000
+BATCH_SIZE = 5_000
 
 Utterance = namedtuple(
     "utterance",
