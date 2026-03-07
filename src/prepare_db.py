@@ -34,14 +34,7 @@ EXPECTED_COUNT = 177_483
 
 Utterance = namedtuple(
     "utterance",
-    [
-        "id",
-        "prev",
-        "next",
-        "text",
-        "who",
-        "year",
-    ],
+    ["id", "prev", "next", "text", "who", "year", "date"],
 )
 
 
@@ -124,6 +117,7 @@ def process_root_queue(q: Queue):
     """
     TODO: Extract debate names
     """
+    id_to_intdate = load_id_to_date()
     while not q.empty():
         c, element, year = q.get()
         if (who := element.get("who")) is not None:
@@ -136,7 +130,7 @@ def process_root_queue(q: Queue):
             text = "\n\n".join(
                 re.sub(r"\s+", " ", seg.text) for seg in element.getchildren()
             )
-            yield Utterance(u_id, prev, nxt, text, who, year)
+            yield Utterance(u_id, prev, nxt, text, who, year, id_to_intdate[u_id])
         else:
             for child in element.getchildren():
                 if (child.tag.endswith("note") or child.tag.endswith("seg")) and (
@@ -162,16 +156,13 @@ def all_utterances_generator():
 
 
 def raw_utterances():
-    items = extract_all_utterances()
-    item = next(items)
-    yield Utterance(None, None, None, "First", None, None)
-    yield item
-    yield from items
-    yield Utterance(None, None, None, "Last", None, None)
+    yield Utterance(None, None, None, "First", None, None, None)
+    yield from extract_all_utterances()
+    yield Utterance(None, None, None, "Last", None, None, None)
 
 
 def merged_utterances():
-    composite = Utterance(None, None, None, None, None, None)
+    composite = Utterance(None, None, None, None, None, None, None)
     for old, new in tqdm(
         pairwise(raw_utterances()),
         total=EXPECTED_COUNT + 1,
@@ -204,6 +195,7 @@ def merged_utterances():
                     text=new.text,
                     who=new.who,
                     year=new.year,
+                    date=new.date,
                 )
             elif old.id == new.prev and old.next is None:
                 old = Utterance(
@@ -213,6 +205,7 @@ def merged_utterances():
                     text=old.text,
                     who=old.who,
                     year=old.year,
+                    date=old.date,
                 )
             else:
                 # raise ValueError(
@@ -229,6 +222,8 @@ def merged_utterances():
                     f.write(ghost)
 
         elif num_nones == 0:
+            if not old.date == new.date:
+                print(f"{old.date=} != {new.date=} for {old=} and {new=}")
             ghost = ""
             if old.next == new.prev:
                 ghost = f"{old.year} ; ghost ; {old.next}\n"
@@ -258,6 +253,7 @@ def merged_utterances():
                 text=new.text,
                 who=new.who,
                 year=new.year,
+                date=new.date,
             )
             continue
 
@@ -277,6 +273,7 @@ def merged_utterances():
                 text=composite.text + " " + new.text,
                 who=composite.who,
                 year=composite.year,
+                date=composite.date,
             )
         # Yielding the composite to create a composite from the new
         else:
@@ -288,6 +285,7 @@ def merged_utterances():
                 text=new.text,
                 who=new.who,
                 year=new.year,
+                date=new.date,
             )
 
 
@@ -358,7 +356,7 @@ def seed_database():
                     "gender": id_to_gender[who],
                     "date": id_to_intdate[u_id],
                 }
-                for u_id, prev, nxt, text, who, year in batch
+                for u_id, prev, nxt, text, who, year, date in batch
             ]
 
             cur.executemany(
