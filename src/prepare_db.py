@@ -197,9 +197,6 @@ def merged_utterances():
             continue
 
         # Merging composite with the new data
-
-
-
         elif all(
             (
                 old.date == new.date,
