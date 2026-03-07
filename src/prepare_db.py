@@ -16,6 +16,8 @@ import re
 
 from math import ceil
 
+from src.settings import BATCH_SIZE, EXPECTED_COUNT, EXPECTED_MERGED_COUNT
+
 
 from .settings import data_dir, tmp_db
 
@@ -26,10 +28,6 @@ import logging
 
 from collections import namedtuple
 from itertools import pairwise
-
-EXPECTED_COUNT = 697_343
-EXPECTED_MERGED_COUNT = 173_713
-BATCH_SIZE = 5_000
 
 Utterance = namedtuple(
     "utterance",
