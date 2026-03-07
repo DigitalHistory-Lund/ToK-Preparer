@@ -67,7 +67,7 @@ if __name__ == "__main__":
             print(f"Inserted {len(persons)} persons.")
 
             # Migrate utterances in batches
-            batch_size = 10000
+            batch_size = 10_000
             offset = 0
             total_count = source_cur.execute(
                 "SELECT COUNT(*) FROM utterance"

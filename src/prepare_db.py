@@ -239,7 +239,7 @@ def create_database():
                 id str primary key,
                 prev text,
                 next text,
-                who text,
+                who text not null,
                 year int,
                 date int,
                 gender text,
@@ -317,7 +317,7 @@ def seed_database():
                 data,
             )
             cur.executemany(
-                "INSERT INTO utterance (id, prev, year, gender, date) values (:id, :who, :year, :gender, :date)",
+                "INSERT INTO utterance (id, who, year, gender, date) values (:id, :who, :year, :gender, :date)",
                 data,
             )
 
