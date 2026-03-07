@@ -184,65 +184,6 @@ def merged_utterances():
             yield composite
             break
 
-        # QC: Check links
-        num_nones = [old.next, new.prev].count(None)
-        if num_nones == 1:
-            if old.next == new.id and new.prev is None:
-                new = Utterance(
-                    id=new.id,
-                    prev=old.id,
-                    next=new.next,
-                    text=new.text,
-                    who=new.who,
-                    year=new.year,
-                    date=new.date,
-                )
-            elif old.id == new.prev and old.next is None:
-                old = Utterance(
-                    id=old.id,
-                    prev=old.prev,
-                    next=new.id,
-                    text=old.text,
-                    who=old.who,
-                    year=old.year,
-                    date=old.date,
-                )
-            else:
-                # raise ValueError(
-                Warning(
-                    f"Broken link ({old.next=}, {new.id=} ;; {old.id=}, {new.prev=})\nbetween {old=} ; {new=}"
-                )
-                ghost = ""
-                if old.next is not None:
-                    ghost = f"{old.year} ; {new.id=} ; {old.next=}\n"
-                elif new.prev is not None:
-                    ghost = f"{new.year} ; {old.id=} ; {new.next=}\n"
-
-                with open(ghost_log, "a", encoding="utf8") as f:
-                    f.write(ghost)
-
-        elif num_nones == 0:
-            if not old.date == new.date:
-                print(f"{old.date=} != {new.date=} for {old=} and {new=}")
-            ghost = ""
-            if old.next == new.prev:
-                ghost = f"{old.year} ; ghost ; {old.next}\n"
-            elif not old.next == new.id:
-                # raise ValueError(
-                Warning(
-                    f"{old.next=} != {new.id=}",
-                )
-                ghost = f"{old.year} ; {new.id=} ; {old.next=}\n"
-            elif not old.id == new.prev:
-                # raise ValueError(
-                Warning(
-                    f"{old.id=} != {new.prev=}",
-                )
-                ghost = f"{new.year} ; {old.id=} ; {new.next=}\n"
-
-            with open(ghost_log, "a") as f:
-                f.write(ghost)
-
         # We do not merge the 'unknowns'
         if old.who == "unknown":
             yield composite
