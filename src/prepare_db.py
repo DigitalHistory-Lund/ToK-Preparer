@@ -27,7 +27,9 @@ import logging
 from collections import namedtuple
 from itertools import pairwise
 
-EXPECTED_COUNT = 273_122
+EXPECTED_COUNT = 697_343
+EXPECTED_MERGED_COUNT = 173_713
+BATCH_SIZE = 10_000
 
 Utterance = namedtuple(
     "utterance",
@@ -145,9 +147,6 @@ def extract_all_utterances():
     yield from process_root_queue(q)
 
 
-def all_utterances_generator():
-    for utterance in tqdm(extract_all_utterances(), total=EXPECTED_COUNT):
-        yield utterance
 
 
 def raw_utterances():
@@ -162,7 +161,9 @@ def merged_utterances():
     for old, new in tqdm(
         pairwise(raw_utterances()),
         total=EXPECTED_COUNT,
-        desc="Merging Utterances",
+        desc="Loading Utterances",
+        position=0,
+        leave=True,
     ):
         # Sifting out first line
         if old.who is None and old.text == "First":
@@ -282,9 +283,20 @@ def seed_database():
         cur = conn.cursor()
         data = []
         for batch in tqdm(
-            batched(merged_utterances(), 50_000),
-            total=ceil(EXPECTED_COUNT / 50_000),
+            batched(
+                tqdm(
+                    merged_utterances(),
+                    position=1,
+                    leave=True,
+                    total=EXPECTED_MERGED_COUNT,
+                    desc="Merged Utterances",
+                ),
+                BATCH_SIZE,
+            ),
+            total=ceil(EXPECTED_MERGED_COUNT / BATCH_SIZE),
             desc="Writing utterances to DB",
+            position=2,
+            leave=True,
         ):
             data = [
                 {
