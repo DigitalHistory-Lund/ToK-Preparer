@@ -333,7 +333,7 @@ def seed_database():
                 data,
             )
             cur.executemany(
-                "INSERT INTO utterance (id, prev, next, who, year, gender, date) values (:id, :prev, :next, :who, :year, :gender, :date)",
+                "INSERT INTO utterance (id, prev, year, gender, date) values (:id, :who, :year, :gender, :date)",
                 data,
             )
 
