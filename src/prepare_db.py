@@ -13,15 +13,12 @@ import json
 import gzip
 import csv
 import re
-import os
 
 from math import ceil
 
-from datetime import datetime
 
 from .settings import data_dir, tmp_db
 
-ghost_log = data_dir / f"{datetime.now().strftime('%Y-%m-%dT%H:%M')}.ghosts.txt"
 from .queries import queries
 
 import logging

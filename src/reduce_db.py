@@ -3,7 +3,6 @@ import sqlite3
 from itertools import batched
 from tqdm import tqdm
 import gzip
-from itertools import pairwise
 
 if out_db.exists():
     raise FileExistsError(f"{out_db} already exists. Remove it before proceeding.")
