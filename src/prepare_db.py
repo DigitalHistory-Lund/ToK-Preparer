@@ -287,7 +287,6 @@ def create_database():
 
 
 def seed_database():
-    id_to_intdate = load_id_to_date()
 
     # ID to gender - default to None if there is no data
     id_to_gender = defaultdict(lambda: None)
@@ -312,7 +311,7 @@ def seed_database():
                     "who": who,
                     "year": year,
                     "gender": id_to_gender[who],
-                    "date": id_to_intdate[u_id],
+                    "date": date,
                 }
                 for u_id, prev, nxt, text, who, year, date in batch
             ]
