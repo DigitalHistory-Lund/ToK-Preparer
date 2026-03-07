@@ -235,7 +235,15 @@ def merged_utterances():
             )
         # Yielding the composite to create a composite from the new
         else:
-            yield composite
+            yield Utterance(
+                id=composite.id,
+                prev=composite.prev,
+                next=new.id,
+                text=composite.text,
+                who=composite.who,
+                year=composite.year,
+                date=composite.date,
+            )
             composite = Utterance(
                 id=new.id,
                 prev=composite.id,
