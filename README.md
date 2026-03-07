@@ -28,3 +28,23 @@
 'Uppaskerska' : ['uppasserska*', 'uppaskerskor*'],
 'Kokerska' : ['kokerska*', 'kokerskor*'],
 ```
+
+## Sanity checks for prev/next links
+
+After building the database, verify that the linked list is well-formed:
+
+```sql
+-- Exactly one row should have prev IS NULL (first) and one next IS NULL (last)
+SELECT
+    (SELECT COUNT(*) FROM utterance WHERE prev IS NULL) AS null_prev,
+    (SELECT COUNT(*) FROM utterance WHERE next IS NULL) AS null_next;
+
+-- All next-links should be symmetric with prev-links
+SELECT
+    (SELECT COUNT(*) FROM utterance WHERE next IS NOT NULL) AS has_next,
+    (SELECT COUNT(*) FROM utterance a
+     JOIN utterance b ON a.next = b.id
+     WHERE b.prev = a.id) AS symmetric;
+```
+
+`null_prev` and `null_next` should both be `1`. `has_next` and `symmetric` should be equal.
