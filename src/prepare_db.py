@@ -161,6 +161,7 @@ def raw_utterances():
     yield Utterance(None, None, None, "Last", None, None, None)
 
 
+
 def merged_utterances():
     composite = Utterance(None, None, None, None, None, None, None)
     for old, new in tqdm(
@@ -337,6 +338,13 @@ def seed_database():
             )
 
             conn.commit()
+
+        # Building new links.
+        cur.execute("""
+        UPDATE utterance
+        SET prev = (SELECT id FROM utterance u2 WHERE u2.rowid = utterance.rowid - 1),
+            next = (SELECT id FROM utterance u2 WHERE u2.rowid = utterance.rowid + 1)
+        """)
 
         cur.execute("""
         UPDATE utterance
