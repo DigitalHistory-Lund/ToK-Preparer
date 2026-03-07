@@ -4,7 +4,7 @@ queries = {
         "änka*",
         "änke*",
         "dam",
-        "dame*",
+        "damern*",  # "mina damer och herrar"
         "dotter*",
         "döttrar*",
         "flick*",

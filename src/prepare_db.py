@@ -205,7 +205,7 @@ def merged_utterances():
         ):
             composite = Utterance(
                 id=composite.id,
-                text=composite.text + " " + new.text,
+                text=composite.text + "\n\n" + new.text,
                 who=composite.who,
                 year=composite.year,
                 date=composite.date,
