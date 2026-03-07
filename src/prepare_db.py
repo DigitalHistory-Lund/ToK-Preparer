@@ -181,6 +181,7 @@ def merged_utterances():
         if old.who is None and old.text == "First":
             composite = new
             continue
+        # And then the last line, which also yields the final composite
         elif new.who is None and new.text == "Last":
             if old.next is not None:
                 raise ValueError(f"{old.next=} is refering to a non-existing item")
@@ -220,9 +221,9 @@ def merged_utterances():
                 )
                 ghost = ""
                 if old.next is not None:
-                    ghost = f"{old.year} ; {new.id=} ; {old.next}\n"
+                    ghost = f"{old.year} ; {new.id=} ; {old.next=}\n"
                 elif new.prev is not None:
-                    ghost = f"{new.year} ; {old.id=} ; {new.next}\n"
+                    ghost = f"{new.year} ; {old.id=} ; {new.next=}\n"
 
                 with open(ghost_log, "a", encoding="utf8") as f:
                     f.write(ghost)
@@ -230,19 +231,19 @@ def merged_utterances():
         elif num_nones == 0:
             ghost = ""
             if old.next == new.prev:
-                ghost = f"{old.year} ; skipped ; {old.next}\n"
+                ghost = f"{old.year} ; ghost ; {old.next}\n"
             elif not old.next == new.id:
                 # raise ValueError(
                 Warning(
                     f"{old.next=} != {new.id=}",
                 )
-                ghost = f"{old.year} ; {new.id=} ; {old.next}\n"
+                ghost = f"{old.year} ; {new.id=} ; {old.next=}\n"
             elif not old.id == new.prev:
                 # raise ValueError(
                 Warning(
                     f"{old.id=} != {new.prev=}",
                 )
-                ghost = f"{new.year} ; {old.id=} ; {new.next}\n"
+                ghost = f"{new.year} ; {old.id=} ; {new.next=}\n"
 
             with open(ghost_log, "a") as f:
                 f.write(ghost)
