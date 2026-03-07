@@ -1,8 +1,45 @@
 from .settings import tmp_db, out_db, root
+from .queries import queries
 import sqlite3
+import re
 from itertools import batched
 from tqdm import tqdm
 import gzip
+
+SUPERSCRIPTS = {"kvinna 1": "\u00b9", "Kvinna 2": "\u00b2", "Kvinna 3": "\u00b3"}
+_WORD_RE = re.compile(r"\w+")
+
+
+def _matches_pattern(word_lower, pattern):
+    if pattern.endswith("*"):
+        return word_lower.startswith(pattern[:-1])
+    return word_lower == pattern
+
+
+def annotate_content(content, k1, k2, k3):
+    """Add unicode superscript category markers to detected words."""
+    active = []
+    if k1:
+        active.append(("kvinna 1", queries["kvinna 1"]))
+    if k2:
+        active.append(("Kvinna 2", queries["Kvinna 2"]))
+    if k3:
+        active.append(("Kvinna 3", queries["Kvinna 3"]))
+    if not active:
+        return content
+
+    def replace_word(match):
+        word = match.group(0)
+        word_lower = word.lower()
+        markers = ""
+        for label, patterns in active:
+            for pattern in patterns:
+                if _matches_pattern(word_lower, pattern):
+                    markers += SUPERSCRIPTS[label]
+                    break
+        return word + markers if markers else word
+
+    return _WORD_RE.sub(replace_word, content)
 
 if out_db.exists():
     raise FileExistsError(f"{out_db} already exists. Remove it before proceeding.")
@@ -103,6 +140,8 @@ if __name__ == "__main__":
                         content,
                     ) = row
                     person_id = person_map[(who, gender, party)]
+                    if k1 or k2 or k3:
+                        content = annotate_content(content, k1, k2, k3)
                     transformed.append(
                         (id_, prev, next_, person_id, year, date, k1, k2, k3, content)
                     )
