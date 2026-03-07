@@ -170,7 +170,15 @@ def merged_utterances():
     ):
         # Sifting out first line
         if old.who is None and old.text == "First":
-            composite = new
+            composite = Utterance(
+                id=new.id,
+                prev=None,
+                next=new.next,
+                text=new.text,
+                who=new.who,
+                year=new.year,
+                date=new.date,
+            )
             continue
         # And then the last line, which also yields the final composite
         elif new.who is None and new.text == "Last":
