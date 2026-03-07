@@ -189,7 +189,15 @@ def merged_utterances():
                     f"{composite.next=} is refering to a non-existing item"
                 )
 
-            yield composite
+            yield Utterance(
+                id=composite.id,
+                prev=composite.prev,
+                next=None,
+                text=composite.text,
+                who=composite.who,
+                year=composite.year,
+                date=composite.date,
+            )
             break
 
         # We do not merge the 'unknowns'
