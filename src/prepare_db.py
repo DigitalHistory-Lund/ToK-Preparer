@@ -30,7 +30,7 @@ import logging
 from collections import namedtuple
 from itertools import pairwise
 
-EXPECTED_COUNT = 177_483
+EXPECTED_COUNT = 273_122
 
 Utterance = namedtuple(
     "utterance",
@@ -166,7 +166,7 @@ def merged_utterances():
     composite = Utterance(None, None, None, None, None, None, None)
     for old, new in tqdm(
         pairwise(raw_utterances()),
-        total=EXPECTED_COUNT + 1,
+        total=EXPECTED_COUNT,
         desc="Merging Utterances",
     ):
         # Sifting out first line
