@@ -34,7 +34,7 @@ EXPECTED_COUNT = 273_122
 
 Utterance = namedtuple(
     "utterance",
-    ["id", "prev", "next", "text", "who", "year", "date"],
+    ["id", "text", "who", "year", "date"],
 )
 
 
@@ -125,12 +125,10 @@ def process_root_queue(q: Queue):
                 [key for key in element.keys() if key.endswith("}id")][0]
             )
             assert u_id
-            prev = element.get("prev")
-            nxt = element.get("next")
             text = "\n\n".join(
                 re.sub(r"\s+", " ", seg.text) for seg in element.getchildren()
             )
-            yield Utterance(u_id, prev, nxt, text, who, year, id_to_intdate[u_id])
+            yield Utterance(u_id, text, who, year, id_to_intdate[u_id])
         else:
             for child in element.getchildren():
                 if (child.tag.endswith("note") or child.tag.endswith("seg")) and (
@@ -156,14 +154,14 @@ def all_utterances_generator():
 
 
 def raw_utterances():
-    yield Utterance(None, None, None, "First", None, None, None)
+    yield Utterance(None, "First", None, None, None)
     yield from extract_all_utterances()
-    yield Utterance(None, None, None, "Last", None, None, None)
+    yield Utterance(None, "Last", None, None, None)
 
 
 
 def merged_utterances():
-    composite = Utterance(None, None, None, None, None, None, None)
+    composite = Utterance(None, None, None, None, None)
     for old, new in tqdm(
         pairwise(raw_utterances()),
         total=EXPECTED_COUNT,
@@ -173,8 +171,6 @@ def merged_utterances():
         if old.who is None and old.text == "First":
             composite = Utterance(
                 id=new.id,
-                prev=None,
-                next=new.next,
                 text=new.text,
                 who=new.who,
                 year=new.year,
@@ -183,17 +179,8 @@ def merged_utterances():
             continue
         # And then the last line, which also yields the final composite
         elif new.who is None and new.text == "Last":
-            if old.next is not None:
-                raise ValueError(f"{old.next=} is refering to a non-existing item")
-            if composite.next is not None:
-                raise ValueError(
-                    f"{composite.next=} is refering to a non-existing item"
-                )
-
             yield Utterance(
                 id=composite.id,
-                prev=composite.prev,
-                next=None,
                 text=composite.text,
                 who=composite.who,
                 year=composite.year,
@@ -206,8 +193,6 @@ def merged_utterances():
             yield composite
             composite = Utterance(
                 id=new.id,
-                prev=composite.id,
-                next=new.next,
                 text=new.text,
                 who=new.who,
                 year=new.year,
@@ -217,18 +202,16 @@ def merged_utterances():
 
         # Merging composite with the new data
 
+
+
         elif all(
             (
                 old.date == new.date,
                 old.who == new.who,
-                old.next == new.id,
-                old.id == new.prev,
             )
         ):
             composite = Utterance(
                 id=composite.id,
-                prev=composite.prev,
-                next=new.next,
                 text=composite.text + " " + new.text,
                 who=composite.who,
                 year=composite.year,
@@ -238,8 +221,6 @@ def merged_utterances():
         else:
             yield Utterance(
                 id=composite.id,
-                prev=composite.prev,
-                next=new.id,
                 text=composite.text,
                 who=composite.who,
                 year=composite.year,
@@ -247,8 +228,6 @@ def merged_utterances():
             )
             composite = Utterance(
                 id=new.id,
-                prev=composite.id,
-                next=new.next,
                 text=new.text,
                 who=new.who,
                 year=new.year,
@@ -313,8 +292,6 @@ def seed_database():
             data = [
                 {
                     "id": u_id,
-                    "prev": prev,
-                    "next": nxt,
                     "content": text,
                     "reverse_content": text[::-1],
                     "who": who,
@@ -322,7 +299,7 @@ def seed_database():
                     "gender": id_to_gender[who],
                     "date": date,
                 }
-                for u_id, prev, nxt, text, who, year, date in batch
+                for u_id, text, who, year, date in batch
             ]
 
             cur.executemany(
