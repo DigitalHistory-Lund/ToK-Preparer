@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18211787.svg)](https://doi.org/10.5281/zenodo.18211787)
+
 # Pre-processing data for ToK utterance browser
 
 ## Old keyword groupings
@@ -48,3 +50,21 @@ SELECT
 ```
 
 `null_prev` and `null_next` should both be `1`. `has_next` and `symmetric` should be equal.
+
+## License
+
+This work is licensed under a
+[Creative Commons Attribution-NonCommercial 4.0 International License](https://creativecommons.org/licenses/by-nc/4.0/)
+(CC BY-NC 4.0). See [`LICENSE`](LICENSE).
+
+## Citation
+
+If you use this site or its derivative data, please cite the Zenodo deposit:
+[10.5281/zenodo.18211787](https://doi.org/10.5281/zenodo.18211787).
+Machine-readable metadata is in [`CITATION.cff`](CITATION.cff).
+
+## Contact
+
+For questions or feedback, contact Mathias Johansson at
+[MathiasJohansson@kultur.lu.se](mailto:MathiasJohansson@kultur.lu.se), or open
+an [issue](https://github.com/DigitalHistory-Lund/ToK-Preparer/issues).
