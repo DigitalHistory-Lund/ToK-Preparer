@@ -16,12 +16,12 @@ import re
 
 from math import ceil
 
-from settings import BATCH_SIZE, EXPECTED_COUNT, EXPECTED_MERGED_COUNT
+from .settings import BATCH_SIZE, EXPECTED_COUNT, EXPECTED_MERGED_COUNT
 
 
-from settings import data_dir, tmp_db
+from .settings import data_dir, tmp_db
 
-from queries import queries
+from .queries import queries
 
 import logging
 
@@ -331,7 +331,7 @@ def seed_database():
                 data,
             )
             cur.executemany(
-                "INSERT INTO utterance (id, who, year, gender, date) values (:id, :who, :year, :gender, :date)",
+                "INSERT INTO utterance (id, who, year, gender, date, kammare) values (:id, :who, :year, :gender, :date, :kammare)",
                 data,
             )
 

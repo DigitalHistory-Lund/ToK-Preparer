@@ -1,5 +1,5 @@
-from settings import tmp_db, out_db, root
-from queries import queries
+from .settings import tmp_db, out_db, root
+from .queries import queries
 import sqlite3
 import re
 from itertools import batched

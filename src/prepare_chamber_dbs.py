@@ -10,8 +10,10 @@ def make_chamber_file(number: int, force=False):
 
     shutil.copyfile(tmp_db, target_file)
 
-    with sqlite3.connect(tmp_db1) as conn:
+    with sqlite3.connect(target_file) as conn:
         conn.execute(f"DELETE FROM utterance where kammare != {number}")
+        conn.commit()
+        conn.execute("VACUUM")
         conn.commit()
 
 
