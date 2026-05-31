@@ -6,6 +6,8 @@ data_dir = root / "data"
 ord_dir = root / "ord"
 
 tmp_db = root / "tmp_db.sqlite3"
+tmp_db1 = root / "tmp_db.1.sqlite3"
+tmp_db2 = root / "tmp_db.2.sqlite3"
 out_db = root / "ToK_data.sqlite3"
 
 data_dir.mkdir(exist_ok=True)
