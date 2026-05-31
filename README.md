@@ -77,6 +77,37 @@ If you use this site or its derivative data, please cite the Zenodo deposit:
 [10.5281/zenodo.18211787](https://doi.org/10.5281/zenodo.18211787).
 Machine-readable metadata is in [`CITATION.cff`](CITATION.cff).
 
+And make sure to cite the original source of the data:
+
+```bib
+@inproceedings{yrjanainen-etal-2024-swedish,
+    title = "The {S}wedish Parliament Corpus 1867 {--} 2022",
+    author = {Yrj{\"a}n{\"a}inen, V{\"a}in{\"o} Aleksi  and
+      Mohammadi Nor{\'e}n, Fredrik  and
+      Borges, Robert  and
+      Jarlbrink, Johan  and
+      {\r{A}}berg Brorsson, Lotta  and
+      Olsson, Anders P.  and
+      Snickars, Pelle  and
+      Magnusson, M{\r{a}}ns},
+    editor = "Calzolari, Nicoletta  and
+      Kan, Min-Yen  and
+      Hoste, Veronique  and
+      Lenci, Alessandro  and
+      Sakti, Sakriani  and
+      Xue, Nianwen",
+    booktitle = "Proceedings of the 2024 Joint International Conference on Computational Linguistics, Language Resources and Evaluation (LREC-COLING 2024)",
+    month = may,
+    year = "2024",
+    address = "Torino, Italia",
+    publisher = "ELRA and ICCL",
+    url = "https://aclanthology.org/2024.lrec-main.1400/",
+    pages = "16100--16112",
+}
+```
+
+
+
 ## Contact
 
 For questions or feedback, contact Mathias Johansson at
