@@ -16,12 +16,12 @@ import re
 
 from math import ceil
 
-from src.settings import BATCH_SIZE, EXPECTED_COUNT, EXPECTED_MERGED_COUNT
+from settings import BATCH_SIZE, EXPECTED_COUNT, EXPECTED_MERGED_COUNT
 
 
-from .settings import data_dir, tmp_db
+from settings import data_dir, tmp_db
 
-from .queries import queries
+from queries import queries
 
 import logging
 
@@ -31,7 +31,7 @@ from itertools import pairwise
 
 Utterance = namedtuple(
     "utterance",
-    ["id", "text", "who", "year", "date"],
+    ["id", "text", "who", "year", "date", "kammare"],
 )
 
 
@@ -107,7 +107,13 @@ def load_person_dates_affiliation():
 def prepare_roots(protocols):
     for protocol in protocols:
         year = int(protocol.split("/")[-2][:4])
-        yield etree.parse(protocol, parser).getroot(), year
+        if "-ak-" in protocol:
+            kammare = 2
+        elif "-fk-" in protocol:
+            kammare = 1
+        else:
+            raise ValueError(f"Invalid protocol: {protocol}")
+        yield etree.parse(protocol, parser).getroot(), year, kammare
 
 
 def process_root_queue(q: Queue):
@@ -116,7 +122,7 @@ def process_root_queue(q: Queue):
     """
     id_to_intdate = load_id_to_date()
     while not q.empty():
-        c, element, year = q.get()
+        c, element, year, kammare = q.get()
         if (who := element.get("who")) is not None:
             u_id = element.get(
                 [key for key in element.keys() if key.endswith("}id")][0]
@@ -125,7 +131,7 @@ def process_root_queue(q: Queue):
             text = "\n\n".join(
                 re.sub(r"\s+", " ", seg.text) for seg in element.getchildren()
             )
-            yield Utterance(u_id, text, who, year, id_to_intdate[u_id])
+            yield Utterance(u_id, text, who, year, id_to_intdate[u_id], kammare)
         else:
             for child in element.getchildren():
                 if (child.tag.endswith("note") or child.tag.endswith("seg")) and (
@@ -133,29 +139,29 @@ def process_root_queue(q: Queue):
                     and not bool(re.search(r"^\S+dag", child.text))
                 ):
                     continue
-                q.put((c + 1, child, year))
+                q.put((c + 1, child, year, kammare))
 
 
 def extract_all_utterances():
     q = Queue()
-    for root, year in prepare_roots(
+    for root, year, kammare in prepare_roots(
         protocol_iterators(corpus_root=data_dir, start=1899, end=1941)
     ):
-        q.put((0, root, year))
+        q.put((0, root, year, kammare))
     yield from process_root_queue(q)
 
 
 
 
 def raw_utterances():
-    yield Utterance(None, "First", None, None, None)
+    yield Utterance(None, "First", None, None, None, None)
     yield from extract_all_utterances()
-    yield Utterance(None, "Last", None, None, None)
+    yield Utterance(None, "Last", None, None, None, None)
 
 
 
 def merged_utterances():
-    composite = Utterance(None, None, None, None, None)
+    composite = Utterance(None, None, None, None, None, None)
     for old, new in tqdm(
         pairwise(raw_utterances()),
         total=EXPECTED_COUNT,
@@ -171,6 +177,7 @@ def merged_utterances():
                 who=new.who,
                 year=new.year,
                 date=new.date,
+                kammare=new.kammare,
             )
             continue
         # And then the last line, which also yields the final composite
@@ -181,6 +188,7 @@ def merged_utterances():
                 who=composite.who,
                 year=composite.year,
                 date=composite.date,
+                kammare=composite.kammare,
             )
             break
 
@@ -193,14 +201,17 @@ def merged_utterances():
                 who=new.who,
                 year=new.year,
                 date=new.date,
+                kammare=new.kammare,
             )
             continue
 
         # Merging composite with the new data
+
         elif all(
             (
                 old.date == new.date,
                 old.who == new.who,
+                old.kammare == new.kammare,
             )
         ):
             composite = Utterance(
@@ -209,6 +220,7 @@ def merged_utterances():
                 who=composite.who,
                 year=composite.year,
                 date=composite.date,
+                kammare=composite.kammare,
             )
         # Yielding the composite to create a composite from the new
         else:
@@ -218,6 +230,7 @@ def merged_utterances():
                 who=composite.who,
                 year=composite.year,
                 date=composite.date,
+                kammare=composite.kammare,
             )
             composite = Utterance(
                 id=new.id,
@@ -225,6 +238,7 @@ def merged_utterances():
                 who=new.who,
                 year=new.year,
                 date=new.date,
+                kammare=new.kammare,
             )
 
 
@@ -239,6 +253,7 @@ def create_database():
                 who text not null,
                 year int,
                 date int,
+                kammare int,
                 gender text,
                 party text,
                 kvinna_1 bool,
@@ -259,6 +274,7 @@ def create_database():
         cur.execute("CREATE index prev_index on utterance(prev)")
         cur.execute("CREATE index who_index on utterance(who)")
         cur.execute("CREATE index year_index on utterance(year)")
+        cur.execute("CREATE index kammare_index on utterance(kammare)")
 
         cur.executemany(
             "INSERT INTO affiliation (who, start, end, party) values (?,?,?,?)",
@@ -302,8 +318,9 @@ def seed_database():
                     "year": year,
                     "gender": id_to_gender[who],
                     "date": date,
+                    "kammare": kammare,
                 }
-                for u_id, text, who, year, date in batch
+                for u_id, text, who, year, date, kammare in batch
             ]
 
             cur.executemany(
@@ -323,8 +340,8 @@ def seed_database():
         # Building new links.
         cur.execute("""
         UPDATE utterance
-        SET prev = (SELECT id FROM utterance u2 WHERE u2.rowid = utterance.rowid - 1),
-            next = (SELECT id FROM utterance u2 WHERE u2.rowid = utterance.rowid + 1)
+        SET prev = (SELECT id FROM utterance u2 WHERE u2.rowid = utterance.rowid - 1 and utterance.kammare == u2.kammare),
+            next = (SELECT id FROM utterance u2 WHERE u2.rowid = utterance.rowid + 1 and utterance.kammare == u2.kammare)
         """)
 
         cur.execute("""
