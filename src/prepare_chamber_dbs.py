@@ -15,18 +15,10 @@ def make_chamber_file(number: int, force=False):
         conn.commit()
 
 
-def make_chamber_1():
-    make_chamber_file(1)
-
-
-def make_chamber_2():
-    make_chamber_file(2)
-
-
 if __name__ == "__main__":
     assert not (tmp_db1.exists() or tmp_db2.exists()), (
         f"\n{tmp_db1=}\t{tmp_db1.exists()}\n{tmp_db2=}\t{tmp_db2.exists()}"
     )
 
-    make_chamber_1()
-    make_chamber_2()
+    make_chamber_file(1)
+    make_chamber_file(2)
