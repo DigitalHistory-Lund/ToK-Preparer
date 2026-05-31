@@ -1,5 +1,5 @@
-from .settings import tmp_db, out_db, root
-from .queries import queries
+from settings import tmp_db, out_db, root
+from queries import queries
 import sqlite3
 import re
 from itertools import batched
@@ -75,6 +75,7 @@ if __name__ == "__main__":
                     person_id INTEGER,
                     year INTEGER,
                     date INTEGER,
+                    kammare INTEGER,
                     kvinna_1 BOOLEAN,
                     kvinna_2 BOOLEAN,
                     kvinna_3 BOOLEAN,
@@ -113,7 +114,7 @@ if __name__ == "__main__":
             for batch in tqdm(
                 batched(
                     source_cur.execute("""
-                    SELECT id, prev, next, who, year, date, gender, party,
+                    SELECT id, prev, next, who, year, date, kammare, gender, party,
                         kvinna_1, kvinna_2, kvinna_3, content
                     FROM utterance join utterance_fts USING(id)
                 """),
@@ -132,6 +133,7 @@ if __name__ == "__main__":
                         who,
                         year,
                         date,
+                        kammare,
                         gender,
                         party,
                         k1,
@@ -143,14 +145,26 @@ if __name__ == "__main__":
                     if k1 or k2 or k3:
                         content = annotate_content(content, k1, k2, k3)
                     transformed.append(
-                        (id_, prev, next_, person_id, year, date, k1, k2, k3, content)
+                        (
+                            id_,
+                            prev,
+                            next_,
+                            person_id,
+                            year,
+                            date,
+                            kammare,
+                            k1,
+                            k2,
+                            k3,
+                            content,
+                        )
                     )
 
                 target_cur.executemany(
                     """
                     INSERT INTO utterance
-                    (id, prev, next, person_id, year, date, kvinna_1, kvinna_2, kvinna_3, content)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, prev, next, person_id, year, date, kammare, kvinna_1, kvinna_2, kvinna_3, content)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                     transformed,
                 )
