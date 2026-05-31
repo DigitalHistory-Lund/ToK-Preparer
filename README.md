@@ -2,6 +2,20 @@
 
 # Pre-processing data for ToK utterance browser
 
+Building on the openly published
+[The Swedish Parliament corpus](https://github.com/swerik-project/the-swedish-parliament-corpus)
+the following repository pre-processes and hosts an annotated version for the
+research project 'Tal om Kvinnor', led by Ulrika Holgersson at Lund University.
+
+The pre-processing includes merging, dating and tagging utterances as well as
+hosting a splitered corpus (split by year) to enable a browser-based corpus
+reader that relies on the annotations created here.
+
+Most of the data used for enrichment are part of the original corpus -- we
+change the format to fit our needs. Our concrete addition is to tag the
+utterances with different groups of words that indicate that the speaker was
+talking about women.
+
 ## Old keyword groupings
 
 ```python
