@@ -1,6 +1,6 @@
 [project]
 name = "tok-preparer"
-version = "0.1.0"
+version = "2026.09.04"
 requires-python = ">=3.12"
 dependencies = [
     "httpx",
