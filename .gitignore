@@ -2,8 +2,15 @@
 *.zip
 *.log
 *.sqlite3
+*.pdf
+
+# Aggregate DB is ~200 MB; exceeds GitHub's 100 MB per-file limit.
+# The per-year ToK_data_YYYY.sqlite3.gz files ARE committed.
+ToK_data.sqlite3.gz
 
 .DS_Store
 
 __pycache__/
 data/
+.worktrees/
+.venv/

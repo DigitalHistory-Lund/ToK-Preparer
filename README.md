@@ -16,6 +16,37 @@ change the format to fit our needs. Our concrete addition is to tag the
 utterances with different groups of words that indicate that the speaker was
 talking about women.
 
+## Setup
+
+Dependencies are managed with [uv](https://docs.astral.sh/uv/getting-started/installation/).
+From the `tok_preparer/` directory:
+
+```bash
+uv sync
+```
+
+The pipeline downloads ~1.5 GB of source corpus files into `data/` on first
+run, so make sure there is disk space available.
+
+## Running the pipeline
+
+Run the four scripts in order. Each depends on the outputs of the previous:
+
+1. `uv run python -m src.download` — fetches `persons.sqlite` and
+   `records_speeches.ndjson.gz` from the swerik-project releases into `data/`.
+2. `uv run python -m src.prepare_db` — builds `tmp_db.sqlite3` (utterances,
+   FTS indexes, prev/next links, Kvinna category tags). Slowest step.
+3. `uv run python -m src.word_frequencies` — reads `tmp_db.sqlite3` and writes
+   `word_frequencies.csv.gz` + `speakers.csv.gz`, plus `.1` / `.2` chamber
+   variants.
+4. `uv run python -m src.reduce_db` — normalises `tmp_db.sqlite3` into
+   `ToK_data.sqlite3`, gzips it to `ToK_data.sqlite3.gz`, and emits per-year
+   `ToK_data_YYYY.sqlite3.gz`. The per-year files are committed to the repo
+   so they ship with the Zenodo deposit (auto-archived from the source
+   tarball) and can be served to the ToK-Reader via
+   `raw.githubusercontent.com`. GitHub's 100 MB single-file limit rules out
+   committing the aggregate `ToK_data.sqlite3.gz` directly.
+
 ## Old keyword groupings
 
 ```python
@@ -45,12 +76,22 @@ talking about women.
 'Kokerska' : ['kokerska*', 'kokerskor*'],
 ```
 
+## Word frequencies
+
+A per-`(year, chamber, gender, party)` snapshot of word-level occurrences
+per Kvinna category is shipped as `word_frequencies.csv.gz` (with
+`.1.csv.gz` and `.2.csv.gz` variants filtered to Chamber 1 and Chamber 2
+respectively). Notebooks should read via
+[`src/data.py`](src/data.py) so the shipped format is a single
+source of truth. See [`docs/word_frequencies.md`](docs/word_frequencies.md)
+for the methodology, file schema, and reproduction recipe.
+
 ## Sanity checks for prev/next links
 
 After building the database, verify that the linked list is well-formed:
 
 ```sql
--- Exactly one row should have prev IS NULL (first) and one next IS NULL (last)
+-- One row per chamber should have prev IS NULL (first) and next IS NULL (last)
 SELECT
     (SELECT COUNT(*) FROM utterance WHERE prev IS NULL) AS null_prev,
     (SELECT COUNT(*) FROM utterance WHERE next IS NULL) AS null_next;
@@ -63,7 +104,9 @@ SELECT
      WHERE b.prev = a.id) AS symmetric;
 ```
 
-`null_prev` and `null_next` should both be `1`. `has_next` and `symmetric` should be equal.
+`null_prev` and `null_next` should both equal the number of chambers
+(2 for the current corpus: Första kammaren and Andra kammaren).
+`has_next` and `symmetric` should be equal.
 
 ## License
 

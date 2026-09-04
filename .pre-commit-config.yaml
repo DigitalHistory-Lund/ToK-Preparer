@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: check-queries
+        name: check queries for cross-group overlap
+        entry: python -m src.check_queries
+        language: system
+        pass_filenames: false
+        files: ^src/(queries|check_queries)\.py$

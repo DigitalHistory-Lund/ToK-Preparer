@@ -1,0 +1,22 @@
+name: check-queries
+on:
+  push:
+    branches: [main, new-corpus-version]
+    paths:
+      - "src/queries.py"
+      - "src/check_queries.py"
+      - ".github/workflows/check-queries.yml"
+  pull_request:
+    paths:
+      - "src/queries.py"
+      - "src/check_queries.py"
+      - ".github/workflows/check-queries.yml"
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m src.check_queries

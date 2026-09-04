@@ -1,4 +1,4 @@
-from .settings import tmp_db, out_db, root
+from .settings import tmp_db, out_db, root, START_YEAR, END_YEAR
 from .queries import queries
 import sqlite3
 import re
@@ -11,6 +11,10 @@ _WORD_RE = re.compile(r"\w+")
 
 
 def _matches_pattern(word_lower, pattern):
+    if pattern.startswith("*") and pattern.endswith("*"):
+        return pattern[1:-1] in word_lower
+    if pattern.startswith("*"):
+        return word_lower.endswith(pattern[1:])
     if pattern.endswith("*"):
         return word_lower.startswith(pattern[:-1])
     return word_lower == pattern
@@ -41,13 +45,12 @@ def annotate_content(content, k1, k2, k3):
 
     return _WORD_RE.sub(replace_word, content)
 
-if out_db.exists():
-    raise FileExistsError(f"{out_db} already exists. Remove it before proceeding.")
-elif not tmp_db.exists():
-    raise FileNotFoundError(f"{tmp_db} does not exist. Run prepare_db.py first.")
-
-
 if __name__ == "__main__":
+    if out_db.exists():
+        raise FileExistsError(f"{out_db} already exists. Remove it before proceeding.")
+    if not tmp_db.exists():
+        raise FileNotFoundError(f"{tmp_db} does not exist. Run prepare_db.py first.")
+
     with sqlite3.connect(tmp_db) as source_conn:
         source_cur = source_conn.cursor()
 
@@ -173,7 +176,8 @@ if __name__ == "__main__":
 
             target_conn.commit()
 
-            for year in tqdm(range(1900, 1941), desc="Creating yearly DBs", total=41):
+            years = range(START_YEAR, END_YEAR + 1)
+            for year in tqdm(years, desc="Creating yearly DBs", total=len(years)):
                 year_db = root / f"ToK_data_{year}.sqlite3"
                 with sqlite3.connect(year_db) as year_conn:
                     target_conn.backup(year_conn)

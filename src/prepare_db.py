@@ -1,8 +1,4 @@
-from pyriksdagen.utils import protocol_iterators
 from itertools import batched
-from pathlib import Path
-from queue import Queue
-from lxml import etree
 from tqdm.auto import tqdm
 
 
@@ -11,15 +7,17 @@ from collections import defaultdict
 import sqlite3
 import json
 import gzip
-import csv
-import re
 
 from math import ceil
 
-from .settings import BATCH_SIZE, EXPECTED_COUNT, EXPECTED_MERGED_COUNT
-
-
-from .settings import data_dir, tmp_db
+from .settings import (
+    BATCH_SIZE,
+    EXPECTED_COUNT,
+    START_YEAR,
+    END_YEAR,
+    data_dir,
+    tmp_db,
+)
 
 from .queries import queries
 
@@ -27,11 +25,10 @@ import logging
 
 
 from collections import namedtuple
-from itertools import pairwise
 
 Utterance = namedtuple(
     "utterance",
-    ["id", "text", "who", "year", "date", "kammare"],
+    ["id", "text", "who", "year", "date", "kammare", "record", "number"],
 )
 
 
@@ -41,7 +38,20 @@ logging.basicConfig(
     filename="prepare_db.log",
 )
 
-parser = etree.XMLParser(remove_blank_text=True)
+
+CHAMBER_MAP = {
+    "Första kammaren": 1,
+    "Andra kammaren": 2,
+}
+
+
+NDJSON_FILE = "records_speeches.ndjson.gz"
+PERSONS_DB = "persons.sqlite"
+PERSON_TABLES = (
+    "processed_member_of_parliament",
+    "processed_minister",
+    "processed_speaker",
+)
 
 
 def datestr_to_int(date_str):
@@ -66,180 +76,91 @@ def datestr_to_int(date_str):
     return int(no_dashes)
 
 
-def load_id_to_date():
-    # Loading utterance to (intified) dates
-    year_path = Path(__file__).parents[1] / "year_data.gzip"
-    if not year_path.exists():
-        raise FileNotFoundError(f'Could not find "{year_path}"')
-    with gzip.open(year_path, "rt") as f:
-        id_to_intdate = {
-            _id: datestr_to_int(date)
-            for date, ids in json.loads(f.read()).items()
-            for _id in ids
-        }
-    return id_to_intdate
+def _normalize_date_bounds(start, end):
+    """Turn free-form YYYY / YYYY-MM / YYYY-MM-DD (optionally with trailing time) into intified sentinels."""
+    start = start.split(" ", 1)[0] if start else start
+    end = end.split(" ", 1)[0] if end else end
+    if start is None or len(start) == 0:
+        start_int = 0
+    elif len(start) == 4:
+        start_int = datestr_to_int(start + "-01-01")
+    elif len(start) == 7:
+        start_int = datestr_to_int(start + "-01")
+    else:
+        start_int = datestr_to_int(start)
+    if end is None or len(end) == 0:
+        end_int = 99999999
+    elif len(end) == 4:
+        end_int = datestr_to_int(end + "-12-31")
+    elif len(end) == 7:
+        end_int = datestr_to_int(end + "-31")
+    else:
+        end_int = datestr_to_int(end)
+    return start_int, end_int
 
 
-# Generator for loading party affiliation with intified date ranges.
+def iter_utterances():
+    """Stream Utterance tuples from the ndjson corpus, filtered to the configured year range."""
+    path = data_dir / NDJSON_FILE
+    if not path.exists():
+        raise FileNotFoundError(f'Could not find "{path}"')
+    with gzip.open(path, "rt") as f:
+        for line in f:
+            row = json.loads(line)
+            kammare = CHAMBER_MAP.get(row.get("chamber"))
+            if kammare is None:
+                continue
+            start_date = row.get("start_date")
+            if not start_date:
+                continue
+            year = int(start_date[:4])
+            if not (START_YEAR <= year <= END_YEAR):
+                continue
+            yield Utterance(
+                id=row["speech"],
+                text=row.get("text") or "",
+                who=row.get("who") or "unknown",
+                year=year,
+                date=datestr_to_int(start_date),
+                kammare=kammare,
+                record=row.get("record") or "",
+                number=row.get("number") or 0,
+            )
+
+
 def load_person_dates_affiliation():
-    for row in csv.DictReader(open(data_dir / "party_affiliation.csv")):
-        if row["start"] is None or len(row["start"]) == 0:
-            start = 0
-        elif len(row["start"]) == 4:
-            start = datestr_to_int(row["start"] + "-01-01")
-        elif len(row["start"]) == 7:
-            start = datestr_to_int(row["start"] + "-01")
-        else:
-            start = datestr_to_int(row["start"])
-        if row["end"] is None or len(row["end"]) == 0:
-            end = 99999999
-        elif len(row["end"]) == 4:
-            end = datestr_to_int(row["end"] + "-12-31")
-        elif len(row["end"]) == 7:
-            end = datestr_to_int(
-                row["end"] + "-31"
-            )  # Since we are not planning on converting these back to actual days, this works.
-        else:
-            end = datestr_to_int(row["end"])
-        yield (row["person_id"], start, end, row["party"])
+    """Yield (person_id, start_int, end_int, party) tuples from persons.sqlite.
 
-
-def prepare_roots(protocols):
-    for protocol in protocols:
-        year = int(protocol.split("/")[-2][:4])
-        if "-ak-" in protocol:
-            kammare = 2
-        elif "-fk-" in protocol:
-            kammare = 1
-        else:
-            raise ValueError(f"Invalid protocol: {protocol}")
-        yield etree.parse(protocol, parser).getroot(), year, kammare
-
-
-def process_root_queue(q: Queue):
+    Prefers the descriptive ``party`` string when set; falls back to
+    ``party_abbrev`` when it isn't. This recovers attributions for rows
+    whose source only carries the abbreviation — a small but meaningful
+    fraction of persons.sqlite where ``party`` is empty but
+    ``party_abbrev`` is not.
     """
-    TODO: Extract debate names
-    """
-    id_to_intdate = load_id_to_date()
-    while not q.empty():
-        c, element, year, kammare = q.get()
-        if (who := element.get("who")) is not None:
-            u_id = element.get(
-                [key for key in element.keys() if key.endswith("}id")][0]
-            )
-            assert u_id
-            text = "\n\n".join(
-                re.sub(r"\s+", " ", seg.text) for seg in element.getchildren()
-            )
-            yield Utterance(u_id, text, who, year, id_to_intdate[u_id], kammare)
-        else:
-            for child in element.getchildren():
-                if (child.tag.endswith("note") or child.tag.endswith("seg")) and (
-                    child.text is not None
-                    and not bool(re.search(r"^\S+dag", child.text))
-                ):
-                    continue
-                q.put((c + 1, child, year, kammare))
+    union_sql = " UNION ALL ".join(
+        f"SELECT person_id, start, end, "
+        f"COALESCE(NULLIF(party, ''), party_abbrev) AS party "
+        f"FROM {tbl} "
+        f"WHERE COALESCE(NULLIF(party, ''), NULLIF(party_abbrev, '')) IS NOT NULL"
+        for tbl in PERSON_TABLES
+    )
+    with sqlite3.connect(f"file:{data_dir / PERSONS_DB}?mode=ro", uri=True) as conn:
+        for person_id, start, end, party in conn.execute(union_sql):
+            start_int, end_int = _normalize_date_bounds(start, end)
+            yield person_id, start_int, end_int, party
 
 
-def extract_all_utterances():
-    q = Queue()
-    for root, year, kammare in prepare_roots(
-        protocol_iterators(corpus_root=data_dir, start=1899, end=1941)
-    ):
-        q.put((0, root, year, kammare))
-    yield from process_root_queue(q)
-
-
-
-
-def raw_utterances():
-    yield Utterance(None, "First", None, None, None, None)
-    yield from extract_all_utterances()
-    yield Utterance(None, "Last", None, None, None, None)
-
-
-
-def merged_utterances():
-    composite = Utterance(None, None, None, None, None, None)
-    for old, new in tqdm(
-        pairwise(raw_utterances()),
-        total=EXPECTED_COUNT,
-        desc="Loading Utterances",
-        position=0,
-        leave=True,
-    ):
-        # Sifting out first line
-        if old.who is None and old.text == "First":
-            composite = Utterance(
-                id=new.id,
-                text=new.text,
-                who=new.who,
-                year=new.year,
-                date=new.date,
-                kammare=new.kammare,
-            )
-            continue
-        # And then the last line, which also yields the final composite
-        elif new.who is None and new.text == "Last":
-            yield Utterance(
-                id=composite.id,
-                text=composite.text,
-                who=composite.who,
-                year=composite.year,
-                date=composite.date,
-                kammare=composite.kammare,
-            )
-            break
-
-        # We do not merge the 'unknowns'
-        if old.who == "unknown":
-            yield composite
-            composite = Utterance(
-                id=new.id,
-                text=new.text,
-                who=new.who,
-                year=new.year,
-                date=new.date,
-                kammare=new.kammare,
-            )
-            continue
-
-        # Merging composite with the new data
-
-        elif all(
-            (
-                old.date == new.date,
-                old.who == new.who,
-                old.kammare == new.kammare,
-            )
-        ):
-            composite = Utterance(
-                id=composite.id,
-                text=composite.text + "\n\n" + new.text,
-                who=composite.who,
-                year=composite.year,
-                date=composite.date,
-                kammare=composite.kammare,
-            )
-        # Yielding the composite to create a composite from the new
-        else:
-            yield Utterance(
-                id=composite.id,
-                text=composite.text,
-                who=composite.who,
-                year=composite.year,
-                date=composite.date,
-                kammare=composite.kammare,
-            )
-            composite = Utterance(
-                id=new.id,
-                text=new.text,
-                who=new.who,
-                year=new.year,
-                date=new.date,
-                kammare=new.kammare,
-            )
+def load_id_to_gender():
+    """Return {person_id: gender} coalesced across all three person tables."""
+    id_to_gender = defaultdict(lambda: None)
+    union_sql = " UNION ".join(
+        f"SELECT person_id, gender FROM {tbl}" for tbl in PERSON_TABLES
+    )
+    with sqlite3.connect(f"file:{data_dir / PERSONS_DB}?mode=ro", uri=True) as conn:
+        for person_id, gender in conn.execute(union_sql):
+            if id_to_gender[person_id] is None and gender:
+                id_to_gender[person_id] = gender
+    return id_to_gender
 
 
 def create_database():
@@ -254,6 +175,8 @@ def create_database():
                 year int,
                 date int,
                 kammare int,
+                record text,
+                number int,
                 gender text,
                 party text,
                 kvinna_1 bool,
@@ -284,27 +207,22 @@ def create_database():
 
 
 def seed_database():
-
-    # ID to gender - default to None if there is no data
-    id_to_gender = defaultdict(lambda: None)
-    for row in csv.DictReader(open(data_dir / "person.csv")):
-        id_to_gender[row["person_id"]] = row["gender"]
+    id_to_gender = load_id_to_gender()
 
     with sqlite3.connect(tmp_db) as conn:
         cur = conn.cursor()
-        data = []
         for batch in tqdm(
             batched(
                 tqdm(
-                    merged_utterances(),
+                    iter_utterances(),
                     position=1,
                     leave=True,
-                    total=EXPECTED_MERGED_COUNT,
-                    desc="Merged Utterances",
+                    total=EXPECTED_COUNT,
+                    desc="Utterances",
                 ),
                 BATCH_SIZE,
             ),
-            total=ceil(EXPECTED_MERGED_COUNT / BATCH_SIZE),
+            total=ceil(EXPECTED_COUNT / BATCH_SIZE),
             desc="Writing utterances to DB",
             position=2,
             leave=True,
@@ -319,8 +237,10 @@ def seed_database():
                     "gender": id_to_gender[who],
                     "date": date,
                     "kammare": kammare,
+                    "record": record,
+                    "number": number,
                 }
-                for u_id, text, who, year, date, kammare in batch
+                for u_id, text, who, year, date, kammare, record, number in batch
             ]
 
             cur.executemany(
@@ -331,17 +251,26 @@ def seed_database():
                 data,
             )
             cur.executemany(
-                "INSERT INTO utterance (id, who, year, gender, date, kammare) values (:id, :who, :year, :gender, :date, :kammare)",
+                "INSERT INTO utterance (id, who, year, gender, date, kammare, record, number) values (:id, :who, :year, :gender, :date, :kammare, :record, :number)",
                 data,
             )
 
             conn.commit()
 
-        # Building new links.
+        # prev/next links per chamber, ordered by (date, record, number) from the source corpus.
         cur.execute("""
+        WITH ordered AS (
+            SELECT id,
+                   LAG(id)  OVER w AS prev,
+                   LEAD(id) OVER w AS next
+            FROM utterance
+            WINDOW w AS (PARTITION BY kammare ORDER BY date, record, number)
+        )
         UPDATE utterance
-        SET prev = (SELECT id FROM utterance u2 WHERE u2.rowid = utterance.rowid - 1 and utterance.kammare == u2.kammare),
-            next = (SELECT id FROM utterance u2 WHERE u2.rowid = utterance.rowid + 1 and utterance.kammare == u2.kammare)
+        SET prev = ordered.prev,
+            next = ordered.next
+        FROM ordered
+        WHERE utterance.id = ordered.id
         """)
 
         cur.execute("""
@@ -361,24 +290,79 @@ def seed_database():
         """)
 
 
+def _split_patterns_by_shape(query_terms):
+    """Return (forward_terms, suffix_terms).
+
+    forward_terms: literals, ``X*`` prefix wildcards, and phrase patterns —
+        all consumable by ``utterance_fts MATCH``.
+    suffix_terms:  ``*X`` suffix wildcards — require ``reverse_utterance_fts``.
+    ``*X*`` contains-patterns are expanded into BOTH a forward ``X*`` and a
+    suffix ``*X`` so any token where the substring appears at the boundary
+    of the FTS-indexed token gets caught. Substring hits in the interior
+    of a token are out of scope — FTS5 doesn't index at that granularity.
+    """
+    fwd, suf = [], []
+    for t in query_terms:
+        if t.startswith("*") and t.endswith("*"):
+            core = t[1:-1]
+            fwd.append(core + "*")
+            suf.append("*" + core)
+        elif t.startswith("*"):
+            suf.append(t)
+        else:
+            fwd.append(t)
+    return fwd, suf
+
+
+def _reverse_suffix_pattern(pattern):
+    """Rewrite a suffix wildcard `*X` into a prefix wildcard against reversed content.
+
+    ``*inna`` → ``anni*``.
+    """
+    assert pattern.startswith("*") and not pattern.endswith("*"), pattern
+    return pattern[1:][::-1] + "*"
+
+
 def tag_utterances_by_query():
     with sqlite3.connect(tmp_db) as conn:
         cur = conn.cursor()
         for label, query_terms in queries.items():
-            query_str = " OR ".join(query_terms)
-            logging.info(f'Tagging utterances for "{label}" with query "{query_str}"')
-            cur.execute(
-                f"""
-                UPDATE utterance
-                SET {label.replace(" ", "_").lower()} = 1
-                WHERE id IN (
-                    SELECT id
-                    FROM utterance_fts
-                    WHERE content MATCH ?
+            col = label.replace(" ", "_").lower()
+            fwd_terms, suf_terms = _split_patterns_by_shape(query_terms)
+
+            if fwd_terms:
+                fwd_query = " OR ".join(fwd_terms)
+                logging.info(
+                    f'Tagging "{label}" via utterance_fts with "{fwd_query}"'
                 )
-                """,
-                (query_str,),
-            )
+                cur.execute(
+                    f"""
+                    UPDATE utterance
+                    SET {col} = 1
+                    WHERE id IN (
+                        SELECT id FROM utterance_fts WHERE content MATCH ?
+                    )
+                    """,
+                    (fwd_query,),
+                )
+
+            if suf_terms:
+                rev_terms = [_reverse_suffix_pattern(t) for t in suf_terms]
+                rev_query = " OR ".join(rev_terms)
+                logging.info(
+                    f'Tagging "{label}" via reverse_utterance_fts with "{rev_query}" '
+                    f"(from suffixes {suf_terms})"
+                )
+                cur.execute(
+                    f"""
+                    UPDATE utterance
+                    SET {col} = 1
+                    WHERE id IN (
+                        SELECT id FROM reverse_utterance_fts WHERE content MATCH ?
+                    )
+                    """,
+                    (rev_query,),
+                )
         conn.commit()
 
 
@@ -414,6 +398,8 @@ def count_baselines():
 
 
 def prepare_database():
+    from .check_queries import validate
+    validate()
     if not tmp_db.exists():
         create_database()
     seed_database()
