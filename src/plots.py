@@ -21,7 +21,7 @@ from __future__ import annotations
 import functools
 from dataclasses import dataclass, field
 from typing import Iterable, Mapping
-
+import warnings
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.axes import Axes
@@ -43,10 +43,10 @@ from .data import (
 # octopus and in the party bloc grid.
 SPEAKER_MARKERS: dict[str, str] = {
     "original_five": "h",  # hexagon — the five 1922 women
-    "loud_man": "X",        # X — high-K-rate male tail
-    "man": "s",             # square — all other men
-    "woman": "o",           # circle — women outside the original 5
-    "unknown": "^",         # triangle — unknown gender / empty who
+    "loud_man": "X",  # X — high-K-rate male tail
+    "man": "s",  # square — all other men
+    "woman": "o",  # circle — women outside the original 5
+    "unknown": "^",  # triangle — unknown gender / empty who
 }
 
 SUFFRAGE_YEAR = 1922
@@ -250,12 +250,14 @@ def _attach_category(df: pd.DataFrame) -> pd.DataFrame:
     lookup = _speaker_category_map()
     d = df.copy()
     d["category"] = d["who"].map(lookup)
+
     # Fallback for who-IDs not in the totals table (e.g. filtered rows).
     def _fallback(row: pd.Series) -> str:
         if pd.notna(row["category"]):
             return row["category"]
         g = row.get("gender")
         return g if g in ("man", "woman") else "unknown"
+
     d["category"] = d.apply(_fallback, axis=1)
     d["marker"] = d["category"].map(SPEAKER_MARKERS).fillna("o")
     return d
@@ -720,9 +722,7 @@ def plot_keyword_shares_by_pattern(
 ) -> Figure:
     """Per-pattern facet: utterance + word share over time, with Wilson CIs.
 
-    Four rows sharing the x-axis, in overview-then-composition order:
-    ``k_all`` on top, then ``k1``, ``k2``, ``k3``. Each row carries twin
-    linear y-axes, both anchored at 0:
+    Four rows sharing the x-axis, in overview-then-composition order: ``k_all`` on top, then ``k1``, ``k2``, ``k3``. Each row carries twin linear y-axes, both anchored at 0:
 
     * Left (blue): utterance share = ``k{key}_utts / utterance_count``
     * Right (orange): word share = ``k{key}_matches / total_words``
@@ -879,35 +879,41 @@ def plot_kvinna_net_composition(
     the ``upsetplot`` library (Lex et al., 2014) via a piecewise draw
     into a nested gridspec so layout stays under our control.
     """
-    from .data import read_kvinna_utterance_subsets, read_kvinna_word_subsets
 
-    style = _style(style)
-    if words_subsets is None:
-        words_subsets = read_kvinna_word_subsets()
-    if utterance_subsets is None:
-        utterance_subsets = read_kvinna_utterance_subsets()
+    with warnings.catch_warnings():
+        warnings.simplefilter(action="ignore", category=FutureWarning)
 
-    fig = plt.figure(figsize=(style.figsize[0] * 1.4, style.figsize[1] * 3.0))
-    outer = fig.add_gridspec(2, 1, hspace=0.35)
+        from .data import read_kvinna_utterance_subsets, read_kvinna_word_subsets
 
-    _draw_upset_block(
-        fig,
-        outer[0, 0],
-        words_subsets,
-        "word_match_count",
-        title="Word matches (tokens)",
-        style=style,
-    )
-    _draw_upset_block(
-        fig,
-        outer[1, 0],
-        utterance_subsets,
-        "utterance_count",
-        title="Utterances",
-        style=style,
-    )
+        style = _style(style)
+        if words_subsets is None:
+            words_subsets = read_kvinna_word_subsets()
+        if utterance_subsets is None:
+            utterance_subsets = read_kvinna_utterance_subsets()
 
-    fig.suptitle("Composition of the kvinna_all keyword net (1900–1940)", fontsize=11)
+        fig = plt.figure(figsize=(style.figsize[0] * 1.4, style.figsize[1] * 3.0))
+        outer = fig.add_gridspec(2, 1, hspace=0.35)
+
+        _draw_upset_block(
+            fig,
+            outer[0, 0],
+            words_subsets,
+            "word_match_count",
+            title="Word matches (tokens)",
+            style=style,
+        )
+        _draw_upset_block(
+            fig,
+            outer[1, 0],
+            utterance_subsets,
+            "utterance_count",
+            title="Utterances",
+            style=style,
+        )
+
+        fig.suptitle(
+            "Composition of the kvinna_all keyword net (1900–1940)", fontsize=11
+        )
     return fig
 
 
@@ -1380,14 +1386,16 @@ def plot_gender_share_utt_and_word(
         w_sub = word[word["gender"] == gender]
 
         ax.plot(
-            u_sub["year"], u_sub["share"],
+            u_sub["year"],
+            u_sub["share"],
             label=f"{gender.capitalize()} — utterance share",
             color=colour,
             marker="o" if gender == "woman" else None,
             markersize=3 if gender == "woman" else 0,
         )
         ax_r.plot(
-            w_sub["year"], w_sub["share"],
+            w_sub["year"],
+            w_sub["share"],
             label=f"{gender.capitalize()} — word share",
             color=colour,
             linestyle="--",
@@ -1416,7 +1424,9 @@ def plot_gender_share_utt_and_word(
     ax.legend(
         lines_l + lines_r,
         labels_l + labels_r,
-        loc="best", frameon=False, fontsize=8,
+        loc="best",
+        frameon=False,
+        fontsize=8,
     )
     fig.tight_layout()
     return fig
@@ -2025,8 +2035,11 @@ def plot_speaker_rate_vs_volume(
         colour = style.gender_colors.get(gender)
         if sub.empty:
             ax.scatter(
-                [], [],
-                s=size, alpha=alpha, color=colour,
+                [],
+                [],
+                s=size,
+                alpha=alpha,
+                color=colour,
                 label=f"{gender.capitalize()} (N=0)",
             )
             continue
@@ -2047,7 +2060,9 @@ def plot_speaker_rate_vs_volume(
                 label=(
                     f"{gender.capitalize()} (N={len(sub)}, "
                     f"mean share={sub['share'].mean():.4f})"
-                ) if first else None,
+                )
+                if first
+                else None,
             )
             first = False
         ax.axhline(
@@ -2261,25 +2276,69 @@ def plot_speaker_starts_vs_chimes_by_gender(
     man_color = style.gender_colors.get("man")
     woman_color = style.gender_colors.get("woman")
     legend_handles = [
-        Line2D([0], [0], marker=SPEAKER_MARKERS["man"], linestyle="",
-               markersize=10, color=man_color, alpha=0.6,
-               label="Man"),
-        Line2D([0], [0], marker=SPEAKER_MARKERS["loud_man"], linestyle="",
-               markersize=12, color=man_color, alpha=0.95,
-               markeredgecolor="black", markeredgewidth=0.5,
-               label="Loud man (top-15 by k_all_utts count)"),
-        Line2D([0], [0], marker=SPEAKER_MARKERS["woman"], linestyle="",
-               markersize=14, color=woman_color, alpha=0.95,
-               label="Woman"),
-        Line2D([0], [0], marker=SPEAKER_MARKERS["original_five"], linestyle="",
-               markersize=16, color=woman_color, alpha=0.95,
-               markeredgecolor="black", markeredgewidth=0.5,
-               label="Original 5 (1922 women)"),
-        Line2D([0], [0], marker=SPEAKER_MARKERS["unknown"], linestyle="",
-               markersize=10, color="#888888", alpha=0.6,
-               label="Unknown"),
-        Line2D([0], [0], linestyle="--", color="#999999", linewidth=0.7,
-               alpha=0.6, label="y = x reference"),
+        Line2D(
+            [0],
+            [0],
+            marker=SPEAKER_MARKERS["man"],
+            linestyle="",
+            markersize=10,
+            color=man_color,
+            alpha=0.6,
+            label="Man",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker=SPEAKER_MARKERS["loud_man"],
+            linestyle="",
+            markersize=12,
+            color=man_color,
+            alpha=0.95,
+            markeredgecolor="black",
+            markeredgewidth=0.5,
+            label="Loud man (top-15 by k_all_utts count)",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker=SPEAKER_MARKERS["woman"],
+            linestyle="",
+            markersize=14,
+            color=woman_color,
+            alpha=0.95,
+            label="Woman",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker=SPEAKER_MARKERS["original_five"],
+            linestyle="",
+            markersize=16,
+            color=woman_color,
+            alpha=0.95,
+            markeredgecolor="black",
+            markeredgewidth=0.5,
+            label="Original 5 (1922 women)",
+        ),
+        Line2D(
+            [0],
+            [0],
+            marker=SPEAKER_MARKERS["unknown"],
+            linestyle="",
+            markersize=10,
+            color="#888888",
+            alpha=0.6,
+            label="Unknown",
+        ),
+        Line2D(
+            [0],
+            [0],
+            linestyle="--",
+            color="#999999",
+            linewidth=0.7,
+            alpha=0.6,
+            label="y = x reference",
+        ),
     ]
     legend_ax.legend(
         handles=legend_handles,
@@ -2586,7 +2645,9 @@ def plot_party_speaker_starts_vs_chimes(
             ax.scatter(
                 msub["starter_rate"],
                 msub["chime_rate"],
-                s=np.sqrt(msub["utterance_count"].values.clip(min=1)) * 4 * (1.3 if is_highlight else 1.0),
+                s=np.sqrt(msub["utterance_count"].values.clip(min=1))
+                * 4
+                * (1.3 if is_highlight else 1.0),
                 c="#e0e0e0",
                 alpha=0.25 + (0.15 if is_highlight else 0.0),
                 marker=marker,
@@ -2600,7 +2661,9 @@ def plot_party_speaker_starts_vs_chimes(
             ax.scatter(
                 msub["starter_rate"],
                 msub["chime_rate"],
-                s=np.sqrt(msub["utterance_count"].values.clip(min=1)) * 4 * (1.3 if is_highlight else 1.0),
+                s=np.sqrt(msub["utterance_count"].values.clip(min=1))
+                * 4
+                * (1.3 if is_highlight else 1.0),
                 c=color,
                 alpha=0.75,
                 marker=marker,

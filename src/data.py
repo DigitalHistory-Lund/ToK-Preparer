@@ -13,6 +13,7 @@ read_word_frequencies``.
 
 from __future__ import annotations
 
+import warnings
 import functools
 import gzip
 import sqlite3
@@ -302,7 +303,9 @@ def build_speaker_totals(
     if persons_path.exists():
         names = _load_speaker_names(persons_path)
     else:
-        names = pd.DataFrame({"who": pd.Series(dtype=str), "name": pd.Series(dtype=str)})
+        names = pd.DataFrame(
+            {"who": pd.Series(dtype=str), "name": pd.Series(dtype=str)}
+        )
     totals = totals.merge(names, on="who", how="left")
     totals["name"] = totals["name"].fillna("")
 
@@ -429,15 +432,20 @@ def build_speaker_word_totals(
 
     rows = []
     for (year, chamber, gender, party, who), b in totals.items():
-        rows.append({
-            "year": year, "chamber": chamber, "gender": gender,
-            "party": party, "who": who,
-            "total_words": b["total_words"],
-            "k1_matches": b["k1_matches"],
-            "k2_matches": b["k2_matches"],
-            "k3_matches": b["k3_matches"],
-            "k_all_matches": b["k_all_matches"],
-        })
+        rows.append(
+            {
+                "year": year,
+                "chamber": chamber,
+                "gender": gender,
+                "party": party,
+                "who": who,
+                "total_words": b["total_words"],
+                "k1_matches": b["k1_matches"],
+                "k2_matches": b["k2_matches"],
+                "k3_matches": b["k3_matches"],
+                "k_all_matches": b["k_all_matches"],
+            }
+        )
     df = pd.DataFrame(rows, columns=list(SPEAKER_WORD_TOTALS_COLUMNS))
     df = df.sort_values(["year", "chamber", "who"]).reset_index(drop=True)
 
@@ -516,9 +524,7 @@ def _yearly_sqlite_path(year: int) -> Path:
 
 
 @functools.lru_cache(maxsize=64)
-def _read_yearly_subsets(
-    year: int, chambers: tuple[int, ...] | None
-) -> pd.DataFrame:
+def _read_yearly_subsets(year: int, chambers: tuple[int, ...] | None) -> pd.DataFrame:
     gz_path = _yearly_sqlite_path(year)
     if not gz_path.exists():
         return pd.DataFrame(columns=["k1", "k2", "k3", "utterance_count"])
@@ -553,14 +559,14 @@ def read_kvinna_utterance_subsets(
     ``ToK_data_YYYY.sqlite3.gz`` files. Defaults iterate all years and
     both chambers. ``years`` and ``chambers`` filter the aggregation.
     """
-    years_tuple = tuple(years) if years is not None else tuple(
-        range(settings.START_YEAR, settings.END_YEAR + 1)
+    years_tuple = (
+        tuple(years)
+        if years is not None
+        else tuple(range(settings.START_YEAR, settings.END_YEAR + 1))
     )
     chambers_tuple = tuple(chambers) if chambers is not None else None
 
-    parts = [
-        _read_yearly_subsets(y, chambers_tuple) for y in years_tuple
-    ]
+    parts = [_read_yearly_subsets(y, chambers_tuple) for y in years_tuple]
     combined = pd.concat(parts, ignore_index=True)
     if combined.empty:
         return combined
@@ -593,9 +599,7 @@ def _starter_sql_body(max_gap: int, min_arc_length: int) -> tuple[str, str]:
     if max_gap < 0:
         raise ValueError(f"max_gap must be >= 0, got {max_gap}")
     if min_arc_length not in (1, 2):
-        raise ValueError(
-            f"min_arc_length must be 1 or 2, got {min_arc_length}"
-        )
+        raise ValueError(f"min_arc_length must be 1 or 2, got {min_arc_length}")
 
     joins: list[str] = []
     backward_no_kvinna: list[str] = []
@@ -611,9 +615,7 @@ def _starter_sql_body(max_gap: int, min_arc_length: int) -> tuple[str, str]:
         next_ref = "u.next"
         for i in range(1, max_gap + 2):
             alias = f"dn{i}"
-            joins.append(
-                f"LEFT JOIN utterance {alias} ON {alias}.id = {next_ref}"
-            )
+            joins.append(f"LEFT JOIN utterance {alias} ON {alias}.id = {next_ref}")
             forward_any_kvinna.append(_kvinna_hit_expr(alias))
             next_ref = f"{alias}.next"
 
@@ -679,9 +681,9 @@ def _read_yearly_starters_by_party(
         placeholders = ",".join(str(int(c)) for c in chambers)
         chamber_clause = f"AND u.kammare IN ({placeholders})"
 
-    sql = _build_starter_sql(
-        max_gap, min_arc_length, key_column="p.party"
-    ).format(chamber_clause=chamber_clause)
+    sql = _build_starter_sql(max_gap, min_arc_length, key_column="p.party").format(
+        chamber_clause=chamber_clause
+    )
 
     with tempfile.NamedTemporaryFile(suffix=".sqlite3") as tmp:
         with gzip.open(gz_path, "rb") as gz:
@@ -710,25 +712,23 @@ def read_topic_arc_starters_by_party(
     :func:`src.plots._reduce_parties`. See :func:`read_topic_arc_starters`
     for the ``max_gap`` / ``min_arc_length`` semantics.
     """
-    years_tuple = tuple(years) if years is not None else tuple(
-        range(settings.START_YEAR, settings.END_YEAR + 1)
+    years_tuple = (
+        tuple(years)
+        if years is not None
+        else tuple(range(settings.START_YEAR, settings.END_YEAR + 1))
     )
     chambers_tuple = tuple(chambers) if chambers is not None else None
 
     parts = [
-        _read_yearly_starters_by_party(
-            y, chambers_tuple, max_gap, min_arc_length
-        )
+        _read_yearly_starters_by_party(y, chambers_tuple, max_gap, min_arc_length)
         for y in years_tuple
     ]
     combined = pd.concat(parts, ignore_index=True)
     if combined.empty:
         return combined
-    return (
-        combined.groupby(["year", "party"], as_index=False, dropna=False)[
-            "starters"
-        ].sum()
-    )
+    return combined.groupby(["year", "party"], as_index=False, dropna=False)[
+        "starters"
+    ].sum()
 
 
 def _build_speaker_starter_sql(max_gap: int, min_arc_length: int = 1) -> str:
@@ -799,15 +799,15 @@ def read_speaker_starter_counts(
     only emits groups with at least one starter); join against
     ``read_speakers()`` to add back the zero-starter speakers.
     """
-    years_tuple = tuple(years) if years is not None else tuple(
-        range(settings.START_YEAR, settings.END_YEAR + 1)
+    years_tuple = (
+        tuple(years)
+        if years is not None
+        else tuple(range(settings.START_YEAR, settings.END_YEAR + 1))
     )
     chambers_tuple = tuple(chambers) if chambers is not None else None
 
     parts = [
-        _read_yearly_speaker_starters(
-            y, chambers_tuple, max_gap, min_arc_length
-        )
+        _read_yearly_speaker_starters(y, chambers_tuple, max_gap, min_arc_length)
         for y in years_tuple
     ]
     combined = pd.concat(parts, ignore_index=True)
@@ -860,9 +860,7 @@ def speaker_starts_chimes(
         speakers = read_speakers()
     if starters is None:
         years_arg = (
-            range(year_range[0], year_range[1] + 1)
-            if year_range is not None
-            else None
+            range(year_range[0], year_range[1] + 1) if year_range is not None else None
         )
         starters = read_speaker_starter_counts(
             years=years_arg,
@@ -886,9 +884,9 @@ def speaker_starts_chimes(
         ["utterance_count", "k_all_utts"]
     ].sum()
 
-    starters_agg = starters.groupby(
-        ["who", "gender"], as_index=False, dropna=False
-    )["starters"].sum()
+    starters_agg = starters.groupby(["who", "gender"], as_index=False, dropna=False)[
+        "starters"
+    ].sum()
 
     m = totals.merge(starters_agg, on=["who", "gender"], how="left")
     m["starters"] = m["starters"].fillna(0).astype(int)
@@ -961,8 +959,10 @@ def read_topic_arc_starters(
     files; the ``years`` and ``chambers`` arguments filter which files
     and chambers contribute.
     """
-    years_tuple = tuple(years) if years is not None else tuple(
-        range(settings.START_YEAR, settings.END_YEAR + 1)
+    years_tuple = (
+        tuple(years)
+        if years is not None
+        else tuple(range(settings.START_YEAR, settings.END_YEAR + 1))
     )
     chambers_tuple = tuple(chambers) if chambers is not None else None
 
@@ -974,11 +974,9 @@ def read_topic_arc_starters(
     if combined.empty:
         return combined
 
-    return (
-        combined.groupby(["year", "gender"], as_index=False, dropna=False)[
-            "starters"
-        ].sum()
-    )
+    return combined.groupby(["year", "gender"], as_index=False, dropna=False)[
+        "starters"
+    ].sum()
 
 
 _WORD_SUBSETS_CSV = settings.root / "word_subsets.csv.gz"
@@ -996,6 +994,7 @@ def read_kvinna_word_subsets(
     pipeline in the same pass that produces ``k{n}_matches`` — so
     subset totals are guaranteed to match the aggregate columns.
     """
+
     df = pd.read_csv(_WORD_SUBSETS_CSV)
     if years is not None:
         df = df[df["year"].isin(list(years))]
@@ -1007,4 +1006,5 @@ def read_kvinna_word_subsets(
         .sum()
         .astype({"k1": bool, "k2": bool, "k3": bool})
     )
+
     return out
