@@ -4,6 +4,7 @@ from tqdm.auto import tqdm
 
 from collections import defaultdict
 
+import csv
 import sqlite3
 import json
 import gzip
@@ -16,10 +17,12 @@ from .settings import (
     START_YEAR,
     END_YEAR,
     data_dir,
+    manual_party_overrides_csv,
     tmp_db,
 )
 
 from .queries import queries
+from .backfill import compute_backfill_affiliations
 
 import logging
 
@@ -150,6 +153,57 @@ def load_person_dates_affiliation():
             yield person_id, start_int, end_int, party
 
 
+def load_all_tenure_rows(persons_db_path=None):
+    """Yield (person_id, start_int, end_int, role, party_or_None) for EVERY tenure
+    row in persons.sqlite, including rows where both party fields are empty.
+
+    The ``party`` element of each yielded tuple is the result of
+    ``COALESCE(NULLIF(party, ''), NULLIF(party_abbrev, ''))``; both an empty
+    string and a NULL in the source columns collapse to ``None`` here. This
+    lets downstream code use ``if party:`` truthiness to distinguish partied
+    from unpartied rows without false positives from empty strings.
+
+    Contrast with :func:`load_person_dates_affiliation`, which filters out
+    unpartied rows because they don't add anything to the direct join. The
+    backfill in :mod:`src.backfill` needs to *see* unpartied windows to
+    know where a person's party is missing.
+    """
+    path = persons_db_path if persons_db_path is not None else data_dir / PERSONS_DB
+    union_sql = " UNION ALL ".join(
+        f"SELECT person_id, start, end, role, "
+        f"COALESCE(NULLIF(party, ''), NULLIF(party_abbrev, '')) AS party "
+        f"FROM {tbl}"
+        for tbl in PERSON_TABLES
+    )
+    with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as conn:
+        for person_id, start, end, role, party in conn.execute(union_sql):
+            start_int, end_int = _normalize_date_bounds(start, end)
+            yield person_id, start_int, end_int, role, party
+
+
+def load_manual_party_overrides(csv_path=None):
+    """Yield (person_id, start_int, end_int, party) tuples from the
+    project-authored manual override CSV.
+
+    Covers parliamentarians who are known-partied from biographical
+    sources but whose ``persons.sqlite`` tenure rows have empty party
+    fields (e.g. Hjalmar Branting, Karl Staaff, Gösta Bagge). Each row
+    is inserted into the ``affiliation`` table as an ordinary row; the
+    utterance-join UPDATE picks it up unchanged.
+
+    Comment lines (starting with ``#``) and blank lines are ignored.
+    See ``docs/party-backfill.md`` section A.6 for methodology,
+    sourcing rules, and confidence categories.
+    """
+    path = csv_path if csv_path is not None else manual_party_overrides_csv
+    with path.open() as f:
+        lines = [line for line in f if line.strip() and not line.startswith("#")]
+    reader = csv.DictReader(lines)
+    for row in reader:
+        start_int, end_int = _normalize_date_bounds(row["start_date"], row["end_date"])
+        yield row["person_id"], start_int, end_int, row["party"]
+
+
 def load_id_to_gender():
     """Return {person_id: gender} coalesced across all three person tables."""
     id_to_gender = defaultdict(lambda: None)
@@ -199,9 +253,22 @@ def create_database():
         cur.execute("CREATE index year_index on utterance(year)")
         cur.execute("CREATE index kammare_index on utterance(kammare)")
 
+        # Idempotency safety net: if the affiliation table already has
+        # rows (e.g. because CREATE TABLE was IF NOT EXISTS'd in a future
+        # refactor), clear it before re-populating so the two INSERTs
+        # below don't duplicate the direct + backfill rows.
+        cur.execute("DELETE FROM affiliation")
         cur.executemany(
             "INSERT INTO affiliation (who, start, end, party) values (?,?,?,?)",
             load_person_dates_affiliation(),
+        )
+        cur.executemany(
+            "INSERT INTO affiliation (who, start, end, party) values (?,?,?,?)",
+            compute_backfill_affiliations(load_all_tenure_rows()),
+        )
+        cur.executemany(
+            "INSERT INTO affiliation (who, start, end, party) values (?,?,?,?)",
+            load_manual_party_overrides(),
         )
         cur.execute("CREATE index aff_index on affiliation(who)")
 

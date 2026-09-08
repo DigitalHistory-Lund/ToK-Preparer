@@ -1,0 +1,70 @@
+# Manual party attributions for parliamentarians who are silently missing from
+# persons.sqlite's party field. Each row is applied at pipeline build time as
+# an extra INSERT into the affiliation table.
+# Columns:
+#   person_id   swerik canonical id
+#   name        primary_name from persons.sqlite (for readability)
+#   start_date  YYYY-MM-DD, inclusive
+#   end_date    YYYY-MM-DD, inclusive
+#   party       swerik canonical party name (must be in DEFAULT_PARTY_MAPPING)
+#   confidence  high | medium | low
+#   source_note free-form provenance / caveat
+#
+# Each person occupies 1..N rows honoring party switches over their career.
+person_id,name,start_date,end_date,party,confidence,source_note
+i-DkE8paHuWrA3pdPYEHLKoY,karl ekman,1908-01-15,1909-12-31,Första kammarens protektionistiska parti,high,sv.wiki Karl Ekman (jurist)
+i-DkE8paHuWrA3pdPYEHLKoY,karl ekman,1910-01-15,1911-06-01,Det förenade högerpartiet,high,
+i-DkE8paHuWrA3pdPYEHLKoY,karl ekman,1912-01-15,1933-06-30,Första kammarens nationella parti,high,
+i-P9uAUSLTPeppBWCVZui5CW,karl magnusson,1915-01-15,1934-12-31,Lantmanna- och borgarepartiet inom andrakammaren,high,sv.wiki Karl Magnusson i Skövde; Lantm-borg maps to Bf under DEFAULT_PARTY_MAPPING
+i-P9uAUSLTPeppBWCVZui5CW,karl magnusson,1935-01-01,1948-12-23,Högerns riksdagsgrupp,high,
+i-VM3kn4h4mTkLoFpEyrhy5t,hjalmar branting,1897-01-15,1925-01-24,Socialdemokraterna,high,sv.wiki; founder and leader of Social Democrats; PM 1920/1921-23/1924-25
+i-KLVdWuEH3iyC7Ws5pZeVNK,daniel persson,1891-01-15,1918-05-24,Liberala samlingspartiet,high,sv.wiki Daniel Persson i Tällberg; pre-1900 lantmanna groupings collapsed to LS successor for bloc-level correctness
+i-XLVGDGtQ7NCyXWncMFEL2t,johan nilsson,1909-01-15,1936-12-31,Första kammarens nationella parti,high,sv.wiki Johan Nilsson i Skottlandshus
+i-XLVGDGtQ7NCyXWncMFEL2t,johan nilsson,1937-01-01,1955-12-17,Utan partibeteckning,high,became partilös 1937 upon taking talman role (standard Riksdag practice for speakers of the era)
+i-RJ9jccyWpgPULxxsYHhYyB,björn frithiofsson holmgren,1921-01-10,1934-12-31,Lantmanna- och borgarepartiet inom andrakammaren,high,sv.wiki; maps to Bf
+i-RJ9jccyWpgPULxxsYHhYyB,björn frithiofsson holmgren,1935-01-01,1944-12-30,Högerns riksdagsgrupp,high,
+i-Wd3cJwboTfCJv1Ls7d8i6d,samuel clason,1907-01-15,1909-12-31,Första kammarens protektionistiska parti,high,sv.wiki Samuel Clason; ecklesiastikminister 1923-24 in Regeringen Trygger (Höger)
+i-Wd3cJwboTfCJv1Ls7d8i6d,samuel clason,1910-01-15,1911-06-01,Det förenade högerpartiet,high,
+i-Wd3cJwboTfCJv1Ls7d8i6d,samuel clason,1912-01-15,1925-06-10,Första kammarens nationella parti,high,
+i-9cYsFuLsrAUioQXvcyUNgJ,erik röing,1906-01-15,1923-12-31,Liberala samlingspartiet,high,sv.wiki Erik Röing
+i-9cYsFuLsrAUioQXvcyUNgJ,erik röing,1924-01-01,1928-06-08,Liberala riksdagspartiet,high,
+i-PoEnkqgRthqgybjNd47ZwU,erik palmstierna,1909-01-15,1911-12-31,Liberala samlingspartiet,high,sv.wiki; crossed floor from L to S in 1912
+i-PoEnkqgRthqgybjNd47ZwU,erik palmstierna,1912-01-01,1920-10-27,Socialdemokraterna,high,sjöförsvarsminister 1917-20 and utrikesminister 1920 in Regeringen Edén / Regeringen Branting I
+i-XQDnBCoJiibzSPLTXopxxL,oscar lövgren,1918-01-15,1923-12-31,Socialdemokratiska vänstergruppen,medium,sv.wiki: SSV 1918-23; followed reformist wing that rejoined S in 1924
+i-XQDnBCoJiibzSPLTXopxxL,oscar lövgren,1924-01-01,1948-12-23,Socialdemokraterna,medium,
+i-KzhJSRaBr9JNVkiCURFzgr,aaby ericsson,1905-01-16,1909-12-31,Första kammarens protektionistiska parti,high,sv.wiki Aaby Ericsson
+i-KzhJSRaBr9JNVkiCURFzgr,aaby ericsson,1910-01-15,1911-06-01,Det förenade högerpartiet,high,
+i-KzhJSRaBr9JNVkiCURFzgr,aaby ericsson,1912-01-15,1921-08-06,Första kammarens nationella parti,high,
+i-C6aD4fFdpUi2nPQGB6E1W7,henrik cavalli,1890-01-15,1909-12-31,Första kammarens protektionistiska parti,high,sv.wiki Henrik Cavalli
+i-C6aD4fFdpUi2nPQGB6E1W7,henrik cavalli,1910-01-15,1911-06-01,Det förenade högerpartiet,high,
+i-C6aD4fFdpUi2nPQGB6E1W7,henrik cavalli,1912-01-15,1917-12-18,Första kammarens nationella parti,high,
+i-5wWRJAXfVgvuneH3sdAR6w,karl karlsson,1897-01-15,1899-12-31,Folkpartiet,high,sv.wiki Karl Karlsson i Göteborg; not to be confused with Karl Gustaf Karlsson i Munkedal (S)
+i-5wWRJAXfVgvuneH3sdAR6w,karl karlsson,1900-01-01,1917-12-18,Liberala samlingspartiet,high,
+i-Hr1HTFqifdBa5H1eAGcaEu,karl staaff,1897-01-15,1899-12-31,Folkpartiet,high,sv.wiki Karl Staaff; Liberal PM 1905-06 and 1911-14; partiledare LS 1907-15
+i-Hr1HTFqifdBa5H1eAGcaEu,karl staaff,1900-01-01,1915-05-29,Liberala samlingspartiet,high,
+i-9HcVjqUUaRi25byWTYJ6eH,gustaf lagerbjelke,1909-01-15,1909-12-31,Första kammarens moderata parti,high,sv.wiki Gustaf Lagerbjelke 1860-1937
+i-9HcVjqUUaRi25byWTYJ6eH,gustaf lagerbjelke,1910-01-15,1911-06-01,Det förenade högerpartiet,high,
+i-9HcVjqUUaRi25byWTYJ6eH,gustaf lagerbjelke,1912-01-15,1930-06-14,Första kammarens nationella parti,high,
+i-SfDZtdC5fgukcXJsiu8J9U,ivar anderson,1925-01-10,1934-12-31,Lantmanna- och borgarepartiet inom andrakammaren,high,sv.wiki Ivar Anderson; SvD editor; maps to Bf
+i-SfDZtdC5fgukcXJsiu8J9U,ivar anderson,1935-01-01,1948-12-23,Högerns riksdagsgrupp,high,
+i-5mpMLJq3f9Fi3TZPGuSp4p,anders pers,1911-01-16,1923-12-31,Liberala samlingspartiet,high,sv.wiki Anders Pers
+i-5mpMLJq3f9Fi3TZPGuSp4p,anders pers,1924-01-01,1927-06-13,Liberala riksdagspartiet,high,
+i-FXLEj98MEhXCxuiihroJSv,edoff andersson,1929-01-10,1934-12-31,Kilbomspartiet,medium,en.wiki Edoff Andersson; entered Riksdag 1929 with Kilbom faction (breakaway from SKP)
+i-CTRDnjHvysaSVk2BrDb7Nd,jacob spens,1910-01-15,1911-06-01,Det förenade högerpartiet,high,sv.wiki Jacob Spens
+i-CTRDnjHvysaSVk2BrDb7Nd,jacob spens,1912-01-15,1933-06-30,Första kammarens nationella parti,high,
+i-CU4eSFiFKKx8yk9jS92iFV,gösta bagge,1932-03-31,1934-12-31,Första kammarens nationella parti,high,sv.wiki Gösta Bagge; partiledare Högerpartiet 1935-44
+i-CU4eSFiFKKx8yk9jS92iFV,gösta bagge,1935-01-01,1947-07-23,Högerns riksdagsgrupp,high,
+i-KBbXYtnknZx7i11LnE5ff8,viktor herou,1922-01-10,1929-12-31,Sveriges kommunistiska parti,medium,en.wiki Viktor Herou; SKP 1921-29
+i-KBbXYtnknZx7i11LnE5ff8,viktor herou,1930-01-01,1934-12-31,Kilbomspartiet,medium,followed Kilbom faction in the 1929 split
+i-KBbXYtnknZx7i11LnE5ff8,viktor herou,1935-01-01,1939-12-31,Socialistiska partiet,medium,Kilbom group renamed Socialistiska partiet in 1934/35
+i-KBbXYtnknZx7i11LnE5ff8,viktor herou,1940-01-01,1940-12-30,Bondeförbundet,medium,defected to Bf in 1940
+i-S4jJECjfFmddUzRkooT6yP,august spångberg,1922-01-10,1929-12-31,Sveriges kommunistiska parti,medium,en.wiki August Spångberg; entered Riksdag 1922 as youngest MP
+i-S4jJECjfFmddUzRkooT6yP,august spångberg,1930-01-01,1934-12-31,Kilbomspartiet,medium,
+i-S4jJECjfFmddUzRkooT6yP,august spångberg,1935-01-01,1937-12-31,Socialistiska partiet,medium,
+i-S4jJECjfFmddUzRkooT6yP,august spångberg,1938-01-01,1964-12-17,Socialdemokraterna,medium,rejoined S in 1938
+i-DA7GTCA3CU2XWPSDGEB8tG,sten stendahl,1919-01-10,1934-12-31,Första kammarens nationella parti,high,sv.wiki Sten Stendahl
+i-DA7GTCA3CU2XWPSDGEB8tG,sten stendahl,1935-01-01,1937-06-15,Högerns riksdagsgrupp,high,
+i-QnWx7Lh7suT7PiAPY3oh23,otto holmdahl,1925-01-10,1934-12-31,Lantmanna- och borgarepartiet inom andrakammaren,high,sv.wiki Otto Holmdahl (teolog); maps to Bf
+i-QnWx7Lh7suT7PiAPY3oh23,otto holmdahl,1935-01-01,1944-12-30,Högerns riksdagsgrupp,high,
+i-8e97Z8CH9cGtDJXCnfJMMg,erik nylander,1918-01-15,1934-12-31,Lantmanna- och borgarepartiet inom andrakammaren,high,sv.wiki Erik Nylander; maps to Bf
+i-8e97Z8CH9cGtDJXCnfJMMg,erik nylander,1935-01-01,1941-07-19,Högerns riksdagsgrupp,high,

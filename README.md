@@ -86,6 +86,56 @@ respectively). Notebooks should read via
 source of truth. See [`docs/word_frequencies.md`](docs/word_frequencies.md)
 for the methodology, file schema, and reproduction recipe.
 
+## Party attribution and backfilling
+
+The upstream `persons.sqlite` from swerik is missing party affiliations
+for roughly 42 % of utterances in our 1900–1940 window — some because a
+speaker's tenure rows have empty `party` fields even when their party
+is well documented elsewhere, some because famous parliamentarians
+(e.g. Hjalmar Branting) have zero partied rows at all. The pipeline
+rescues about 21.5 pp of these utterances in three layers, all applied
+inside `create_database()` in [`src/prepare_db.py`](src/prepare_db.py):
+
+1. **Direct affiliation load** — the original join through
+   `load_person_dates_affiliation()`.
+2. **Tier A+B backfill** — [`src/backfill.py`](src/backfill.py) synthesises
+   affiliation rows for unpartied tenure windows that have a same-role
+   partied neighbour within ±15 years, using a mode-across-windows rule
+   with alphabetical tiebreak and a "Lindhagen guard" for single-window
+   ambiguity. Tests in [`tests/test_backfill.py`](tests/test_backfill.py)
+   pin the contract case-by-case.
+3. **Manual overrides** — [`src/manual_party_overrides.csv`](src/manual_party_overrides.csv)
+   ships a curated 56-row table covering the 25 most-cited bucket-C
+   parliamentarians (Branting, Staaff, Bagge, Spångberg, Palmstierna,
+   Nilsson, …). Per-era splits honour documented party switches. Loader
+   is `load_manual_party_overrides()` in
+   [`src/prepare_db.py`](src/prepare_db.py).
+
+Combined effect: retention rises from 57.79 % to 79.26 %; the residual
+20.53 % blank-party rate has a hard 3.69 pp floor from utterances whose
+speaker identity is `"unknown"` in the source records. Full methodology,
+per-tier numbers, disambiguation rules, and threats-to-validity are in
+[`docs/party-backfill.md`](docs/party-backfill.md).
+
+## Discussion metadata
+
+The shipped `ToK_data_YYYY.sqlite3(.gz)` files carry a `discussion_id`
+INTEGER column on the `utterance` table. It groups the 141k utterances
+into ~2,236 topic arcs — the paper's operational definition of a
+"discussion about women" (`max_gap=1, min_arc_length=2`: tolerate one
+non-kvinna interjection, drop isolated single-utterance mentions).
+Non-kvinna interjections inside an arc receive the surrounding arc's
+id so `SELECT * FROM utterance WHERE discussion_id = N ORDER BY date`
+returns the discussion as a contiguous span; utterances outside any
+arc are NULL. Arcs never span sessions (one `record` = one day of
+proceedings) — a debate that resumes on the following day gets a
+fresh id. The column is computed by `compute_discussion_ids()` in
+[`src/reduce_db.py`](src/reduce_db.py) after utterance migration;
+tests are in [`tests/test_reduce_db.py`](tests/test_reduce_db.py).
+See [`docs/discussion-metadata.md`](docs/discussion-metadata.md) for
+the arc algorithm, semantics, and how to re-derive different
+parameter sets from `kvinna_1/2/3 + prev/next`.
+
 ## Sanity checks for prev/next links
 
 After building the database, verify that the linked list is well-formed:

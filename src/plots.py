@@ -75,6 +75,10 @@ YEAR_MAX = 1940
 # - Bf: Bondeförbundet + earlier Lantmanna groupings and later Centerpartiet.
 # - K:  Left of Socialdemokraterna — SSV / Vänsterpartiet (1917),
 #       Sveriges kommunistiska parti and its Kilbom/socialist splits.
+# - UP: "Utan partibeteckning" — speakers whose identity is known in
+#       persons.sqlite but who carry no party affiliation for the
+#       utterance's date. Kept as its own bloc rather than pooled with
+#       any historical party so the figures don't misattribute them.
 DEFAULT_PARTY_MAPPING: dict[str, tuple[str, ...]] = {
     "S": ("Socialdemokraterna",),
     "H": (
@@ -113,6 +117,7 @@ DEFAULT_PARTY_MAPPING: dict[str, tuple[str, ...]] = {
         "Socialistiska partiet",
         "Socialdemokratiska vänstergruppen",
     ),
+    "UP": ("Utan partibeteckning",),
 }
 
 
@@ -156,6 +161,7 @@ class PlotStyle:
             "L": "#4daf4a",
             "Bf": "#984ea3",
             "K": "#a65628",
+            "UP": "#7f7f7f",
         }
     )
     party_labels: dict = field(
@@ -165,6 +171,7 @@ class PlotStyle:
             "L": "Liberala familjen",
             "Bf": "Bondeförbundet (och föregångare)",
             "K": "Vänster om S",
+            "UP": "Utan partibeteckning",
         }
     )
     kvinna_stack_colors: dict = field(
@@ -1634,7 +1641,7 @@ def plot_woman_chime_vs_start(
 def plot_party_share(
     df: pd.DataFrame | None = None,
     *,
-    parties: Iterable[str] = ("S", "H", "L", "Bf", "K"),
+    parties: Iterable[str] = ("S", "H", "L", "Bf", "K", "UP"),
     mapping: Mapping[str, Iterable[str]] | None = None,
     style: PlotStyle | None = None,
 ) -> Figure:
@@ -1654,7 +1661,10 @@ def plot_party_share(
     small before ~1917 and shows high year-to-year variance. Pass
     ``parties=("S","H","L","Bf")`` to drop it, or filter years where a
     bloc has too few utterances to give a meaningful share, if the
-    paper's argument doesn't rest on the K line.
+    paper's argument doesn't rest on the K line. The UP bloc
+    ("Utan partibeteckning") is also small (~1% of utterances) and
+    follows its own dynamics — pass a shorter ``parties=`` tuple to
+    omit it if a figure needs only the historical party lines.
     """
     style = _style(style)
     df = _frame(df)
@@ -1696,7 +1706,7 @@ def plot_party_share(
 def plot_party_share_stacked(
     df: pd.DataFrame | None = None,
     *,
-    parties: Iterable[str] = ("S", "H", "L", "Bf", "K"),
+    parties: Iterable[str] = ("S", "H", "L", "Bf", "K", "UP"),
     mapping: Mapping[str, Iterable[str]] | None = None,
     include_other: bool = True,
     style: PlotStyle | None = None,
@@ -2540,7 +2550,7 @@ def plot_party_speaker_starts_vs_chimes(
     starters_df: pd.DataFrame | None = None,
     speakers_df: pd.DataFrame | None = None,
     *,
-    blocs: Iterable[str] = ("S", "H", "L", "Bf", "K"),
+    blocs: Iterable[str] = ("S", "H", "L", "Bf", "K", "UP"),
     include_unaffiliated: bool = True,
     window: tuple[int, int] = (1922, 1940),
     mapping: Mapping[str, Iterable[str]] | None = None,

@@ -719,10 +719,13 @@ class PartySubsetTest(unittest.TestCase):
         ]
         self.assertEqual(len(content), 1)
 
-    def test_default_party_mapping_covers_five_blocs(self):
-        # Sanity check: the shipped default mapping has exactly the five
-        # bloc labels the paper's methods section will name.
-        self.assertEqual(set(DEFAULT_PARTY_MAPPING), {"S", "H", "L", "Bf", "K"})
+    def test_default_party_mapping_covers_expected_blocs(self):
+        # Sanity check: the shipped default mapping has exactly the
+        # bloc labels the paper's methods section will name (five
+        # historical blocs plus UP for "Utan partibeteckning").
+        self.assertEqual(
+            set(DEFAULT_PARTY_MAPPING), {"S", "H", "L", "Bf", "K", "UP"}
+        )
 
     def test_stacked_shares_sum_to_one_when_include_other(self):
         # With include_other=True every year's stack must sum to 1.0
@@ -1194,21 +1197,21 @@ class PartySpeakerStartsVsChimesTest(unittest.TestCase):
             {"year": 1922, "gender": "woman", "who": "zoe",   "starters":  5},
         ])
 
-    def test_default_produces_six_panels_including_unaffiliated(self):
+    def test_default_produces_seven_panels_including_unaffiliated(self):
         fig = plot_party_speaker_starts_vs_chimes(
             self._starters_df(), self._speakers_df()
         )
-        # 5 blocs + 1 unaffiliated = 6 visible axes; grid is 2x3, all cells used.
+        # 6 blocs (S, H, L, Bf, K, UP) + 1 unaffiliated = 7 visible axes.
         self.assertIsInstance(fig, Figure)
         visible = [ax for ax in fig.axes if ax.get_visible()]
-        self.assertEqual(len(visible), 6)
+        self.assertEqual(len(visible), 7)
 
     def test_include_unaffiliated_false_hides_that_panel(self):
         fig = plot_party_speaker_starts_vs_chimes(
             self._starters_df(), self._speakers_df(), include_unaffiliated=False,
         )
         visible = [ax for ax in fig.axes if ax.get_visible()]
-        self.assertEqual(len(visible), 5)
+        self.assertEqual(len(visible), 6)
 
     def test_bloc_subset_produces_that_many_panels(self):
         fig = plot_party_speaker_starts_vs_chimes(

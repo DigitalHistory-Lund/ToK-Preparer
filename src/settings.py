@@ -21,6 +21,7 @@ speaker_word_totals = root / "speaker_word_totals.csv.gz"
 data_dir.mkdir(exist_ok=True)
 persons_db = data_dir / "persons.sqlite"
 data_here = Path(__file__).parent.resolve() / "data"
+manual_party_overrides_csv = Path(__file__).parent.resolve() / "manual_party_overrides.csv"
 
 # preparation config
 START_YEAR = 1900

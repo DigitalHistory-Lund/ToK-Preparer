@@ -3,11 +3,79 @@ from .queries import queries
 import sqlite3
 import re
 from itertools import batched
+from typing import Iterable
 from tqdm import tqdm
 import gzip
 
 SUPERSCRIPTS = {"kvinna 1": "\u00b9", "Kvinna 2": "\u00b2", "Kvinna 3": "\u00b3"}
 _WORD_RE = re.compile(r"\w+")
+
+
+def compute_discussion_ids(
+    session_sequences: Iterable[Iterable[tuple[str, bool]]],
+) -> dict[str, int]:
+    """Assign a ``discussion_id`` to every utterance in an arc.
+
+    Uses the paper's shipped defaults (``max_gap=1``, ``min_arc_length=2``):
+    an arc is a maximal chain-run in which no two consecutive utterances
+    are both non-kvinna; arcs shorter than 2 kvinna utterances are dropped;
+    the single non-kvinna interjection that ``max_gap=1`` tolerates
+    receives the surrounding arc's id.
+
+    Parameters
+    ----------
+    session_sequences
+        Iterable of per-session ordered iterables. Each inner element
+        is a ``(utterance_id, is_kvinna)`` tuple in chain order within
+        one *session* (one day's parliamentary sitting \u2014 one ``record``
+        in swerik's ``prot-YYYY--{fk|ak}--NNN`` scheme). Arcs cannot
+        span sessions: the two halves of a discussion that resumes on
+        a following day get separate ids. Chamber locality is inherent
+        because a session is chamber-scoped by definition. Ids are
+        assigned from a single monotone counter starting at 1 so every
+        id in the returned dict is globally unique.
+
+    Returns
+    -------
+    dict[str, int]
+        ``{utterance_id: discussion_id}``. Utterances not in any arc
+        (isolated single kvinna, unconfirmed leading/trailing interjection,
+        pure non-kvinna outside all arcs) are omitted \u2014 callers should
+        treat absence as SQL ``NULL``.
+    """
+    out: dict[str, int] = {}
+    next_arc_id = 1
+    for session in session_sequences:
+        arc: list[str] = []
+        arc_kvinna_count = 0
+        pending: str | None = None
+        for utt_id, is_kvinna in session:
+            if is_kvinna:
+                if pending is not None:
+                    arc.append(pending)
+                    pending = None
+                arc.append(utt_id)
+                arc_kvinna_count += 1
+            else:
+                if not arc:
+                    continue  # pre-arc non-kvinna; nothing to interject
+                if pending is None:
+                    pending = utt_id
+                else:
+                    # Two consecutive non-kvinna \u2192 close the arc.
+                    if arc_kvinna_count >= 2:
+                        for member_id in arc:
+                            out[member_id] = next_arc_id
+                        next_arc_id += 1
+                    arc = []
+                    arc_kvinna_count = 0
+                    pending = None
+        # End of session: close any open arc (drop trailing pending).
+        if arc and arc_kvinna_count >= 2:
+            for member_id in arc:
+                out[member_id] = next_arc_id
+            next_arc_id += 1
+    return out
 
 
 def _matches_pattern(word_lower, pattern):
@@ -82,6 +150,7 @@ if __name__ == "__main__":
                     kvinna_1 BOOLEAN,
                     kvinna_2 BOOLEAN,
                     kvinna_3 BOOLEAN,
+                    discussion_id INTEGER,
                     FOREIGN KEY (person_id) REFERENCES person(id)
                 )
             """)
@@ -175,6 +244,49 @@ if __name__ == "__main__":
                 target_conn.commit()
 
             target_conn.commit()
+
+            # Populate discussion_id: assign a stable arc id to every
+            # utterance that belongs to a paper-default topic arc
+            # (max_gap=1, min_arc_length=2). Arcs cannot span sessions,
+            # where "session" = one day's parliamentary sitting = one
+            # `record` in swerik's prot-YYYY--{fk|ak}--NNN scheme. We
+            # source ordering from tmp_db because target_conn dropped
+            # `record`/`number` at migration time. `record` already
+            # encodes chamber (fk/ak) and date, so partitioning by
+            # `record` alone is sufficient — no need to also partition
+            # by `kammare`.
+            session_sequences: list[list[tuple[str, bool]]] = []
+            current_record: str | None = None
+            current: list[tuple[str, bool]] = []
+            for uid, record, is_kvinna in source_cur.execute("""
+                SELECT id, record,
+                       (COALESCE(kvinna_1, 0) OR COALESCE(kvinna_2, 0)
+                                              OR COALESCE(kvinna_3, 0)) AS is_kvinna
+                FROM utterance
+                ORDER BY kammare, record, number
+            """):
+                if record != current_record:
+                    if current:
+                        session_sequences.append(current)
+                    current = []
+                    current_record = record
+                current.append((uid, bool(is_kvinna)))
+            if current:
+                session_sequences.append(current)
+
+            id_to_arc = compute_discussion_ids(session_sequences)
+            target_cur.executemany(
+                "UPDATE utterance SET discussion_id = ? WHERE id = ?",
+                [(arc_id, uid) for uid, arc_id in id_to_arc.items()],
+            )
+            target_cur.execute(
+                "CREATE INDEX discussion_idx ON utterance(discussion_id)"
+            )
+            target_conn.commit()
+            print(
+                f"Tagged {len(id_to_arc):,} utterances across "
+                f"{max(id_to_arc.values(), default=0):,} topic-arc discussions."
+            )
 
             years = range(START_YEAR, END_YEAR + 1)
             for year in tqdm(years, desc="Creating yearly DBs", total=len(years)):
