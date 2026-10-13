@@ -7,6 +7,9 @@ import sqlite3
 import unittest
 
 from src.export_discussions import (
+    DOI_URL,
+    PROJECT_URL,
+    project_version,
     Discussion,
     Utterance,
     discussion_record,
@@ -163,6 +166,17 @@ class SplitRuns(unittest.TestCase):
         self.assertEqual(split_runs("fru²³!"), [("fru²³", True), ("!", False)])
 
 
+class ProjectVersion(unittest.TestCase):
+    def test_reads_version_from_pyproject(self):
+        import tomllib
+        from src.settings import root
+
+        with open(root / "pyproject.toml", "rb") as fh:
+            expected = tomllib.load(fh)["project"]["version"]
+        self.assertEqual(project_version(), expected)
+        self.assertRegex(project_version(), r"^\d{4}\.\d{2}\.\d{2}$")
+
+
 class DisplayName(unittest.TestCase):
     def test_title_cases_and_keeps_particles(self):
         self.assertEqual(display_name("oskar strutz"), "Oskar Strutz")
@@ -199,6 +213,19 @@ class Records(unittest.TestCase):
         self.assertEqual(recs[1]["date"], "1922-05-27")
         self.assertEqual(recs[1]["chamber"], 1)
 
+    def test_records_carry_source_urls_and_version(self):
+        expected = {
+            "project_url": PROJECT_URL,
+            "doi_url": DOI_URL,
+            "version": project_version(),
+        }
+        rec = discussion_record(_sample_discussion(1))
+        self.assertEqual(rec["source"], expected)
+        for u in utterance_records(_sample_discussion(2)):
+            self.assertEqual(u["source"], expected)
+        self.assertEqual(PROJECT_URL, "https://github.com/DigitalHistory-Lund/ToK-Preparer")
+        self.assertEqual(DOI_URL, "https://doi.org/10.5281/zenodo.18211787")
+
     def test_file_stem(self):
         self.assertEqual(file_stem(_sample_discussion()), "1922-05-27_fk_d0423")
         d2 = _sample_discussion()
@@ -217,6 +244,20 @@ class RenderDocx(unittest.TestCase):
         plain = [r.text for p in doc.paragraphs for r in p.runs if not r.bold]
         self.assertTrue(any("-- ja." in t for t in plain))
 
+    def test_has_hyperlinks_to_project_and_doi(self):
+        doc = render_docx(_sample_discussion(1))
+        targets = {rel.target_ref for rel in doc.part.rels.values() if rel.is_external}
+        self.assertIn(PROJECT_URL, targets)
+        self.assertIn(DOI_URL, targets)
+        texts = "\n".join(p.text for p in doc.paragraphs)
+        self.assertIn(PROJECT_URL, texts)
+        self.assertIn(DOI_URL, texts)
+
+    def test_header_shows_version(self):
+        doc = render_docx(_sample_discussion(1))
+        texts = [p.text for p in doc.paragraphs]
+        self.assertIn(f"Version: {project_version()}", texts)
+
     def test_deterministic_bytes(self):
         self.assertEqual(docx_bytes(_sample_discussion(2)), docx_bytes(_sample_discussion(2)))
 
@@ -231,6 +272,18 @@ class RenderPdf(unittest.TestCase):
     def test_returns_pdf_bytes(self):
         out = render_pdf(_sample_discussion(1))
         self.assertTrue(out.startswith(b"%PDF"))
+
+    def test_has_links_to_project_and_doi(self):
+        out = render_pdf(_sample_discussion(1))
+        self.assertIn(PROJECT_URL.encode(), out)
+        self.assertIn(DOI_URL.encode(), out)
+        self.assertIn(b"/URI", out)
+
+    def test_header_shows_version(self):
+        out = render_pdf(_sample_discussion(1))
+        # fpdf2 subsets fonts and encodes text as glyph ids, so check the
+        # version via the document metadata instead of the page stream.
+        self.assertIn(f"/Subject ({project_version()}".encode(), out)
 
     def test_long_discussion_spans_pages(self):
         long_text = ("Herr talman! Hon² talade länge om kvinnor¹ — ”mycket”. " * 40)
