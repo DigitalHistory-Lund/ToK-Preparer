@@ -3,6 +3,8 @@
 *.log
 *.sqlite3
 *.pdf
+# Generated discussion reference files (src/export_discussions.py) ARE committed.
+!discussions/**/*.pdf
 
 # Aggregate DB is ~200 MB; exceeds GitHub's 100 MB per-file limit.
 # The per-year ToK_data_YYYY.sqlite3.gz files ARE committed.
