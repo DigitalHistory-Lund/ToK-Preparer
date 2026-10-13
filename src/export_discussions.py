@@ -22,11 +22,13 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import functools
 import gzip
 import io
 import json
 import re
 import sqlite3
+import tomllib
 import zipfile
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -54,6 +56,7 @@ LABELS = {
     "source": "Källa",
     "project": "Projekt",
     "doi": "DOI",
+    "version": "Version",
     "legend": "Markerade ord: ¹ kvinna-ord, ² släktskaps- och tilltalsord, ³ yrkestitlar.",
     "page": "Sida {n}",
 }
@@ -63,7 +66,20 @@ SOURCE_LINE = (
 )
 PROJECT_URL = "https://github.com/DigitalHistory-Lund/ToK-Preparer"
 DOI_URL = "https://doi.org/10.5281/zenodo.18211787"
-SOURCE = {"project_url": PROJECT_URL, "doi_url": DOI_URL}
+
+
+@functools.lru_cache(maxsize=1)
+def project_version() -> str:
+    """The ``[project].version`` from ``pyproject.toml`` (date-based, matches
+    the release tags). Bump it before regenerating so every file carries the
+    version it ships in."""
+    with open(settings.root / "pyproject.toml", "rb") as fh:
+        return tomllib.load(fh)["project"]["version"]
+
+
+def source_record() -> dict:
+    """Attribution block embedded in every jsonl record."""
+    return {"project_url": PROJECT_URL, "doi_url": DOI_URL, "version": project_version()}
 
 # Pinned so that unchanged input yields identical bytes across runs.
 FIXED_DATETIME = datetime(2000, 1, 1, tzinfo=timezone.utc)
@@ -264,7 +280,7 @@ def discussion_record(d: Discussion) -> dict:
         "chamber": d.chamber,
         "chamber_name": d.chamber_name,
         "n_utterances": len(d.utterances),
-        "source": dict(SOURCE),
+        "source": source_record(),
         "utterances": [asdict(u) for u in d.utterances],
     }
 
@@ -276,7 +292,7 @@ def utterance_records(d: Discussion) -> list[dict]:
             "discussion_id": d.id,
             "date": d.date,
             "chamber": d.chamber,
-            "source": dict(SOURCE),
+            "source": source_record(),
             **asdict(u),
         }
         for u in d.utterances
@@ -301,6 +317,7 @@ def _metadata_lines(d: Discussion) -> list[tuple[str, str, str | None]]:
         (LABELS["source"], SOURCE_LINE, None),
         (LABELS["project"], PROJECT_URL, PROJECT_URL),
         (LABELS["doi"], DOI_URL, DOI_URL),
+        (LABELS["version"], project_version(), None),
     ]
 
 
@@ -339,6 +356,8 @@ def render_docx(d: Discussion) -> Document:
     props.last_printed = FIXED_DATETIME
     props.author = "Tal om Kvinnor"
     props.title = LABELS["title"].format(id=d.id)
+    props.version = project_version()
+    props.subject = f"{project_version()} ({DOI_URL})"
 
     doc.add_heading(LABELS["title"].format(id=d.id), level=0)
     for label, value, url in _metadata_lines(d):
@@ -396,6 +415,7 @@ def render_pdf(d: Discussion) -> bytes:
     pdf.set_creation_date(FIXED_DATETIME)
     pdf.set_title(LABELS["title"].format(id=d.id))
     pdf.set_author("Tal om Kvinnor")
+    pdf.set_subject(f"{project_version()} ({DOI_URL})")
     pdf.add_font(FONT_FAMILY, "", FONT_DIR / "DejaVuSans.ttf")
     pdf.add_font(FONT_FAMILY, "B", FONT_DIR / "DejaVuSans-Bold.ttf")
     pdf.set_margins(20, 20, 20)
