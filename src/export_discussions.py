@@ -34,7 +34,8 @@ from pathlib import Path
 from typing import Iterable, Iterator
 
 from docx import Document
-from docx.shared import Pt
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from fpdf import FPDF
 from tqdm import tqdm
 
@@ -51,13 +52,18 @@ LABELS = {
     "chamber": "Kammare",
     "n_utterances": "Antal yttranden",
     "source": "Källa",
+    "project": "Projekt",
+    "doi": "DOI",
     "legend": "Markerade ord: ¹ kvinna-ord, ² släktskaps- och tilltalsord, ³ yrkestitlar.",
     "page": "Sida {n}",
 }
 SOURCE_LINE = (
-    "Tal om Kvinnor: Annotated Corpus (doi:10.5281/zenodo.18211787), "
+    "Tal om Kvinnor: Annotated Corpus, "
     "byggd på The Swedish Parliament Corpus (Yrjänäinen m.fl. 2024)."
 )
+PROJECT_URL = "https://github.com/DigitalHistory-Lund/ToK-Preparer"
+DOI_URL = "https://doi.org/10.5281/zenodo.18211787"
+SOURCE = {"project_url": PROJECT_URL, "doi_url": DOI_URL}
 
 # Pinned so that unchanged input yields identical bytes across runs.
 FIXED_DATETIME = datetime(2000, 1, 1, tzinfo=timezone.utc)
@@ -258,6 +264,7 @@ def discussion_record(d: Discussion) -> dict:
         "chamber": d.chamber,
         "chamber_name": d.chamber_name,
         "n_utterances": len(d.utterances),
+        "source": dict(SOURCE),
         "utterances": [asdict(u) for u in d.utterances],
     }
 
@@ -265,7 +272,13 @@ def discussion_record(d: Discussion) -> dict:
 def utterance_records(d: Discussion) -> list[dict]:
     """Per-discussion jsonl lines: one per utterance, with discussion keys."""
     return [
-        {"discussion_id": d.id, "date": d.date, "chamber": d.chamber, **asdict(u)}
+        {
+            "discussion_id": d.id,
+            "date": d.date,
+            "chamber": d.chamber,
+            "source": dict(SOURCE),
+            **asdict(u),
+        }
         for u in d.utterances
     ]
 
@@ -278,18 +291,44 @@ def _speaker_heading(u: Utterance) -> str:
     return f"{u.order}. {u.speaker_name} ({u.party or '–'}, {u.gender or '–'})"
 
 
-def _metadata_lines(d: Discussion) -> list[tuple[str, str]]:
+def _metadata_lines(d: Discussion) -> list[tuple[str, str, str | None]]:
+    """``(label, value, url)`` rows for the document header; ``url`` set
+    when the value should be rendered as a hyperlink."""
     return [
-        (LABELS["date"], d.date),
-        (LABELS["chamber"], d.chamber_name),
-        (LABELS["n_utterances"], str(len(d.utterances))),
-        (LABELS["source"], SOURCE_LINE),
+        (LABELS["date"], d.date, None),
+        (LABELS["chamber"], d.chamber_name, None),
+        (LABELS["n_utterances"], str(len(d.utterances)), None),
+        (LABELS["source"], SOURCE_LINE, None),
+        (LABELS["project"], PROJECT_URL, PROJECT_URL),
+        (LABELS["doi"], DOI_URL, DOI_URL),
     ]
 
 
 # --------------------------------------------------------------------------
 # DOCX
 # --------------------------------------------------------------------------
+
+
+def _add_hyperlink(paragraph, url: str, text: str) -> None:
+    """python-docx has no public hyperlink API; build the w:hyperlink element."""
+    r_id = paragraph.part.relate_to(
+        url, "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink",
+        is_external=True,
+    )
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("r:id"), r_id)
+    run = OxmlElement("w:r")
+    rpr = OxmlElement("w:rPr")
+    style = OxmlElement("w:rStyle")
+    style.set(qn("w:val"), "Hyperlink")
+    rpr.append(style)
+    run.append(rpr)
+    t = OxmlElement("w:t")
+    t.text = text
+    t.set(qn("xml:space"), "preserve")
+    run.append(t)
+    hyperlink.append(run)
+    paragraph._p.append(hyperlink)
 
 
 def render_docx(d: Discussion) -> Document:
@@ -302,10 +341,13 @@ def render_docx(d: Discussion) -> Document:
     props.title = LABELS["title"].format(id=d.id)
 
     doc.add_heading(LABELS["title"].format(id=d.id), level=0)
-    for label, value in _metadata_lines(d):
+    for label, value, url in _metadata_lines(d):
         p = doc.add_paragraph()
         p.add_run(f"{label}: ").bold = True
-        p.add_run(value)
+        if url:
+            _add_hyperlink(p, url, value)
+        else:
+            p.add_run(value)
     doc.add_paragraph(LABELS["legend"]).runs[0].italic = True
 
     for u in d.utterances:
@@ -364,11 +406,16 @@ def render_pdf(d: Discussion) -> bytes:
     pdf.set_font(FONT_FAMILY, "B", 16)
     pdf.cell(0, 10, LABELS["title"].format(id=d.id), new_x="LMARGIN", new_y="NEXT")
     pdf.set_font(FONT_FAMILY, size=10)
-    for label, value in _metadata_lines(d):
+    for label, value, url in _metadata_lines(d):
         pdf.set_font(FONT_FAMILY, "B", 10)
         pdf.write(line, f"{label}: ")
         pdf.set_font(FONT_FAMILY, "", 10)
-        pdf.write(line, value)
+        if url:
+            pdf.set_text_color(0, 0, 160)
+            pdf.write(line, value, link=url)
+            pdf.set_text_color(0)
+        else:
+            pdf.write(line, value)
         pdf.ln(line)
     pdf.ln(2)
     pdf.set_font(FONT_FAMILY, "", 9)

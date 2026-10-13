@@ -7,6 +7,8 @@ import sqlite3
 import unittest
 
 from src.export_discussions import (
+    DOI_URL,
+    PROJECT_URL,
     Discussion,
     Utterance,
     discussion_record,
@@ -199,6 +201,14 @@ class Records(unittest.TestCase):
         self.assertEqual(recs[1]["date"], "1922-05-27")
         self.assertEqual(recs[1]["chamber"], 1)
 
+    def test_records_carry_source_urls(self):
+        rec = discussion_record(_sample_discussion(1))
+        self.assertEqual(rec["source"], {"project_url": PROJECT_URL, "doi_url": DOI_URL})
+        for u in utterance_records(_sample_discussion(2)):
+            self.assertEqual(u["source"], {"project_url": PROJECT_URL, "doi_url": DOI_URL})
+        self.assertEqual(PROJECT_URL, "https://github.com/DigitalHistory-Lund/ToK-Preparer")
+        self.assertEqual(DOI_URL, "https://doi.org/10.5281/zenodo.18211787")
+
     def test_file_stem(self):
         self.assertEqual(file_stem(_sample_discussion()), "1922-05-27_fk_d0423")
         d2 = _sample_discussion()
@@ -217,6 +227,15 @@ class RenderDocx(unittest.TestCase):
         plain = [r.text for p in doc.paragraphs for r in p.runs if not r.bold]
         self.assertTrue(any("-- ja." in t for t in plain))
 
+    def test_has_hyperlinks_to_project_and_doi(self):
+        doc = render_docx(_sample_discussion(1))
+        targets = {rel.target_ref for rel in doc.part.rels.values() if rel.is_external}
+        self.assertIn(PROJECT_URL, targets)
+        self.assertIn(DOI_URL, targets)
+        texts = "\n".join(p.text for p in doc.paragraphs)
+        self.assertIn(PROJECT_URL, texts)
+        self.assertIn(DOI_URL, texts)
+
     def test_deterministic_bytes(self):
         self.assertEqual(docx_bytes(_sample_discussion(2)), docx_bytes(_sample_discussion(2)))
 
@@ -231,6 +250,12 @@ class RenderPdf(unittest.TestCase):
     def test_returns_pdf_bytes(self):
         out = render_pdf(_sample_discussion(1))
         self.assertTrue(out.startswith(b"%PDF"))
+
+    def test_has_links_to_project_and_doi(self):
+        out = render_pdf(_sample_discussion(1))
+        self.assertIn(PROJECT_URL.encode(), out)
+        self.assertIn(DOI_URL.encode(), out)
+        self.assertIn(b"/URI", out)
 
     def test_long_discussion_spans_pages(self):
         long_text = ("Herr talman! Hon² talade länge om kvinnor¹ — ”mycket”. " * 40)

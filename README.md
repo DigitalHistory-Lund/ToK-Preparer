@@ -163,11 +163,14 @@ so a file can be joined back to the database. Utterances are ordered by
 walking the `prev`/`next` chain. Speaker names come from
 `speaker_totals.csv.gz`; speakers with no mapped name show their swerik id.
 
-JSONL keys per utterance: `discussion_id, date, chamber, order, id,
-speaker_id, speaker_name, gender, party, kvinna_1, kvinna_2, kvinna_3,
+JSONL keys per utterance: `discussion_id, date, chamber, source, order,
+id, speaker_id, speaker_name, gender, party, kvinna_1, kvinna_2, kvinna_3,
 content`. The aggregate `discussions.jsonl.gz` adds `year, chamber_name,
 n_utterances` and nests the utterance objects under `utterances`.
 `content` keeps the `¹²³` superscripts that mark K1/K2/K3 matches.
+`source` is `{"project_url": ..., "doi_url": ...}` pointing at this
+repository and the Zenodo DOI, so a file stays attributable on its own;
+the PDF and DOCX headers carry the same two links.
 
 The export is byte-deterministic (pinned document dates, fixed zip and gzip
 timestamps), so re-running it on unchanged databases leaves `git status`
