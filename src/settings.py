@@ -29,3 +29,5 @@ END_YEAR = 1940
 EXPECTED_COUNT = 697_343
 EXPECTED_MERGED_COUNT = 173_713
 BATCH_SIZE = 5_000
+
+discussions_dir = root / "discussions"
