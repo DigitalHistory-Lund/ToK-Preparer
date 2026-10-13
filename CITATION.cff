@@ -3,7 +3,7 @@ type: software
 title: "Tal om Kvinnor: Annotated Corpus"
 message: "If you use this site or its derivative data, please cite it using these metadata."
 url: "https://github.com/DigitalHistory-Lund/ToK-Preparer"
-date-released: "2025-12-09"
+date-released: "2026-10-13"
 license: CC-BY-NC-4.0
 identifiers:
   - type: doi
